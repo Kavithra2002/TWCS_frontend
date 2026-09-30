@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --c-50: 248 250 252;
+  --c-100: 241 245 249;
+  --c-200: 226 232 240;
+  --c-300: 203 213 225;
+  --c-400: 148 163 184;
+  --c-500: 100 116 139;
+  --c-600: 71 85 105;
+  --c-700: 51 65 85;
+  --c-800: 30 41 59;
+  --c-900: 15 23 42;
+  --c-950: 2 6 23;
+  --chart-grid: #1e293b;
+  --chart-tooltip-bg: #0f172a;
+  --chart-tooltip-fg: #e2e8f0;
+  --chart-tooltip-border: #334155;
+  --chart-track: #1e293b;
+}
+
+html.light {
+  color-scheme: light;
+  --c-50: 2 6 23;
+  --c-100: 15 23 42;
+  --c-200: 30 41 59;
+  --c-300: 51 65 85;
+  --c-400: 71 85 105;
+  --c-500: 100 116 139;
+  --c-600: 100 116 139;
+  --c-700: 203 213 225;
+  --c-800: 226 232 240;
+  --c-900: 255 255 255;
+  --c-950: 241 245 249;
+  --chart-grid: #e2e8f0;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-fg: #0f172a;
+  --chart-tooltip-border: #cbd5e1;
+  --chart-track: #e2e8f0;
+}
+
+/* Accent text that is tuned for a dark surface. */
+html.light .text-tea-200 { color: #1a6141; }
+html.light .text-tea-300 { color: #1a6141; }
+html.light .text-tea-400 { color: #1f7a4e; }
+html.light .hover\:text-tea-300:hover { color: #174e36; }
+html.light .text-emerald-300 { color: #047857; }
+html.light .text-emerald-400 { color: #059669; }
+html.light .text-sky-300 { color: #0369a1; }
+html.light .text-sky-400 { color: #0284c7; }
+html.light .text-amber-300 { color: #b45309; }
+html.light .text-amber-400 { color: #d97706; }
+html.light .text-red-300 { color: #b91c1c; }
+html.light .text-red-400 { color: #dc2626; }
+
+html.light .bg-slate-900\/60 {
+  background-color: #fff;
+}
+
+html.light .theme-icon-sun { display: none; }
+html:not(.light) .theme-icon-moon { display: none; }
+
+body {
+  @apply bg-slate-950 text-slate-200 antialiased;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-tea-500 focus:outline-none focus:ring-1 focus:ring-tea-500 disabled:opacity-50;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
+  }
+  .table-base {
+    @apply w-full text-left text-sm;
+  }
+  .table-base thead th {
+    @apply border-b border-slate-800 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400;
+  }
+  .table-base tbody td {
+    @apply border-b border-slate-800/60 px-3 py-2.5 align-middle;
+  }
+  .table-base tbody tr:hover {
+    @apply bg-slate-800/30;
+  }
+}
+
+/* Recharts tweaks for the dark theme */
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+}
+.recharts-text {
+  fill: #94a3b8;
+  font-size: 11px;
+}
+html.light .recharts-text {
+  fill: #64748b;
+}
