@@ -7,17 +7,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import estate from '@/images/4f3265e534371093b0b8717c1a9dd035.jpg';
 import logo from '@/images/logo.jpeg';
-import { DEV_PERSONAS, getActivePersona, signInAsPersona, type DevViewId } from '@/lib/dev-personas';
+import { ApiError, api } from '@/lib/api';
+import { setSession } from '@/lib/auth';
+import type { User } from '@/types';
 
 const REMEMBER_KEY = 'twcs.login.email';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [activeId, setActiveId] = useState<DevViewId | null>(null);
-  const [entering, setEntering] = useState<DevViewId | null>(null);
-
   useEffect(() => {
-    setActiveId(getActivePersona()?.id ?? null);
     const root = document.documentElement;
     const previousBody = document.body.style.overflow;
     const previousRoot = root.style.overflow;
@@ -28,13 +25,6 @@ export default function LoginPage() {
       root.style.overflow = previousRoot;
     };
   }, []);
-
-  function enter(id: DevViewId) {
-    if (entering) return;
-    setEntering(id);
-    signInAsPersona(id);
-    router.push('/');
-  }
 
   return (
     <main className="relative h-dvh overflow-hidden bg-[#0d3b2c] text-[#1a1a1a]" style={{ colorScheme: 'light' }}>
@@ -59,34 +49,12 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-4 right-4 z-30 flex gap-2 sm:bottom-5 sm:right-5">
-        {DEV_PERSONAS.map((persona) => {
-          const current = activeId === persona.id;
-          const busy = entering === persona.id;
-          const label = persona.title.replace(' view', '');
-          return (
-            <button
-              key={persona.id}
-              type="button"
-              onClick={() => enter(persona.id)}
-              disabled={entering !== null}
-              className={clsx(
-                'rounded-md px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1a6b40] focus-visible:ring-offset-2 disabled:cursor-wait',
-                current
-                  ? 'bg-[#1a6b40] text-white'
-                  : 'border border-[#d3dbd5] bg-white text-[#1c382b] hover:bg-[#f3f7f4]',
-              )}
-            >
-              {busy ? 'Opening…' : label}
-            </button>
-          );
-        })}
-      </div>
     </main>
   );
 }
 
 function SignInForm() {
+  const router = useRouter();
   const emailId = useId();
   const passwordId = useId();
   const resetEmailId = useId();
@@ -135,9 +103,18 @@ function SignInForm() {
     }
 
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    setSubmitting(false);
-    setErrors({ form: 'Sign-in is not connected yet. Use a test view at the bottom right to continue.' });
+    try {
+      const result = await api<{ token: string; user: User }>(
+        '/auth/login',
+        { method: 'POST', json: { email: email.trim(), password }, live: true },
+      );
+      setSession(result.token, result.user);
+      router.push('/');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Could not sign in. Check that the API is running.';
+      setErrors({ form: message });
+      setSubmitting(false);
+    }
   }
 
   function onReset(event: FormEvent) {
