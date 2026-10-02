@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Loading } from '@/components/ui/States';
 import { api, API_URL } from '@/lib/api';
-import { canPlan } from '@/lib/auth';
+import { canPlan, roleLabel } from '@/lib/auth';
 import { SENSOR_META, sortSensors } from '@/lib/sensors';
 import type { Sensor, TroughWithLive } from '@/types';
 
@@ -74,7 +74,7 @@ export default function SettingsPage() {
             <dl className="space-y-2 text-sm">
               <Row label="Name" value={user?.name} />
               <Row label="Email" value={user?.email} />
-              <Row label="Role" value={user?.role} />
+              <Row label="Role" value={user ? roleLabel(user.role) : undefined} />
             </dl>
           </Card>
           <Card title="Device integration" subtitle="How PLCs / IoT gateways push readings">
