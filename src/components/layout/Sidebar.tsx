@@ -1,8 +1,6 @@
 'use client';
 
 import clsx from 'clsx';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import {
   Bell,
   CalendarClock,
@@ -13,15 +11,19 @@ import {
   Settings,
   type LucideIcon,
 } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import logo from '@/images/logo.jpeg';
 
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/troughs', label: 'Troughs', icon: Layers },
-  { href: '/batches', label: 'Batches', icon: Leaf },
-  { href: '/schedules', label: 'Schedules', icon: CalendarClock },
-  { href: '/alerts', label: 'Alerts', icon: Bell },
-  { href: '/reports', label: 'Reports', icon: FileBarChart },
-  { href: '/settings', label: 'Settings', icon: Settings },
+const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[] = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard, iconClass: 'bg-sky-500/15 text-sky-400' },
+  { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/15 text-teal-400' },
+  { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/15 text-emerald-400' },
+  { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/15 text-amber-400' },
+  { href: '/alerts', label: 'Alerts', icon: Bell, iconClass: 'bg-red-500/15 text-red-400' },
+  { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/15 text-violet-400' },
+  { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/15 text-indigo-400' },
 ];
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
@@ -35,18 +37,18 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
-      <div className="flex h-16 items-center gap-2.5 border-b border-slate-800 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-tea-600">
-          <Leaf className="h-4 w-4 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold tracking-wide text-slate-50">TWCS</p>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">Withering Control</p>
-        </div>
+      <div className="border-b border-slate-800 px-3 py-3">
+        <Image
+          src={logo}
+          alt="TWCS — Tea Withering Control System"
+          priority
+          sizes="216px"
+          className="h-auto w-full rounded-md bg-white"
+        />
       </div>
 
       <nav className="flex-1 space-y-0.5 p-3">
-        {NAV.map(({ href, label, icon: Icon }) => (
+        {NAV.map(({ href, label, icon: Icon, iconClass }) => (
           <Link
             key={href}
             href={href}
@@ -58,7 +60,9 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
                 : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
             )}
           >
-            <Icon className="h-4 w-4" />
+            <span className={clsx('flex h-6 w-6 shrink-0 items-center justify-center rounded-md', iconClass)}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
             {label}
           </Link>
         ))}
