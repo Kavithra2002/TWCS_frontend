@@ -1,6 +1,5 @@
 // Mirrors the backend DTOs. Keep in sync with backend/src/modules/*.
 
-export type Role = 'ADMIN' | 'SUPERVISOR' | 'OPERATOR' | 'VIEWER';
 export type TroughStatus = 'IDLE' | 'RUNNING' | 'MAINTENANCE' | 'OFFLINE';
 export type SensorType =
   | 'AIR_TEMPERATURE'
@@ -24,7 +23,10 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LatestReading {

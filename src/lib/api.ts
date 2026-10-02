@@ -14,13 +14,12 @@ export class ApiError extends Error {
   }
 }
 
-type ApiInit = Omit<RequestInit, 'body'> & { json?: unknown };
+type ApiInit = Omit<RequestInit, 'body'> & { json?: unknown; live?: boolean };
 
 /** Fetch wrapper: adds the JWT, JSON-encodes `json`, unwraps `{ error }` responses. */
 export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
-  if (USE_DEMO_DATA) return demoRequest<T>(path, init);
-
-  const { json, ...rest } = init;
+  const { json, live, ...rest } = init;
+  if (USE_DEMO_DATA && !live) return demoRequest<T>(path, { method: rest.method, json });
   const headers = new Headers(rest.headers);
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
