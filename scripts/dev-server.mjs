@@ -12,7 +12,7 @@ const internalOrigin = `http://127.0.0.1:${internalPort}`;
 
 // Compiled before the browser is allowed through, so a click does not sit
 // behind a cold Turbopack compile.
-const routes = ['/login', '/', '/troughs', '/batches', '/schedules', '/alerts', '/reports', '/settings', '/troughs/trough-01'];
+const routes = ['/login', '/', '/troughs', '/batches', '/schedules', '/alerts', '/reports', '/settings', '/users', '/troughs/trough-01'];
 
 const nextBin = path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next');
 const child = spawn(
@@ -28,7 +28,9 @@ function relay(stream, out) {
     const lines = rest.split('\n');
     rest = lines.pop() ?? '';
     for (const line of lines) {
-      out.write(line.replaceAll(`127.0.0.1:${internalPort}`, `localhost:${publicPort}`) + '\n');
+      // Next prints its own URL as soon as it binds. Hide that until every page is compiled.
+      if (/^\s*-\s+(Local|Network):/.test(line)) continue;
+      out.write(line + '\n');
     }
   });
 }
@@ -125,10 +127,7 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-server.listen(publicPort, () => {
-  console.log(`\nTWCS dev: http://localhost:${publicPort}`);
-  console.log('Compiling every page once before the app accepts clicks.\n');
-});
+server.listen(publicPort);
 
 async function waitForServer() {
   const deadline = Date.now() + 60_000;
@@ -160,7 +159,7 @@ async function preload() {
     }
   }
   warm = true;
-  console.log(`\nPages ready in ${((Date.now() - started) / 1000).toFixed(1)}s — http://localhost:${publicPort}\n`);
+  console.log(`\nhttp://localhost:${publicPort}\n`);
 }
 
 preload();
