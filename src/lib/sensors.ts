@@ -29,7 +29,7 @@ export const SENSOR_META: Record<SensorType, SensorMeta> = {
   LEAF_MOISTURE: { label: 'Leaf moisture', short: 'Moisture', unit: '%', color: '#22c55e', icon: Leaf, decimals: 1, range: [40, 90] },
   AIRFLOW: { label: 'Airflow', short: 'Airflow', unit: 'm³/h', color: '#a78bfa', icon: Wind, decimals: 0, range: [0, 35000] },
   FAN_SPEED: { label: 'Fan speed', short: 'Fan', unit: 'rpm', color: '#facc15', icon: Fan, decimals: 0, range: [0, 1600] },
-  LEAF_WEIGHT: { label: 'Leaf weight', short: 'Weight', unit: 'kg', color: '#94a3b8', icon: Weight, decimals: 0, range: [0, 2000] },
+  LEAF_WEIGHT: { label: 'Leaf weight', short: 'Weight', unit: 'kg', color: '#a1a1aa', icon: Weight, decimals: 0, range: [0, 2000] },
 };
 
 export const SENSOR_ORDER: SensorType[] = [
@@ -56,7 +56,7 @@ export function rangeState(value: number | null | undefined, sensor: Pick<Sensor
 
 export const TROUGH_STATUS_STYLE: Record<TroughStatus, { label: string; className: string; color: string }> = {
   RUNNING: { label: 'Running', className: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30', color: '#10b981' },
-  IDLE: { label: 'Idle', className: 'bg-slate-500/15 text-slate-300 ring-slate-500/30', color: '#64748b' },
+  IDLE: { label: 'Idle', className: 'bg-slate-500/15 text-slate-300 ring-slate-500/30', color: '#71717a' },
   MAINTENANCE: { label: 'Maintenance', className: 'bg-amber-500/15 text-amber-300 ring-amber-500/30', color: '#f59e0b' },
   OFFLINE: { label: 'Offline', className: 'bg-red-500/15 text-red-300 ring-red-500/30', color: '#ef4444' },
 };
@@ -80,5 +80,5 @@ export const SCHEDULE_ACTION_STYLE: Record<ScheduleAction, { label: string; colo
   HEATER_ON: { label: 'Hot air', color: '#f97316' },
   REVERSE_AIRFLOW: { label: 'Reverse airflow', color: '#8b5cf6' },
   LEAF_TURNING: { label: 'Leaf turning', color: '#06b6d4' },
-  MAINTENANCE: { label: 'Maintenance', color: '#64748b' },
+  MAINTENANCE: { label: 'Maintenance', color: '#71717a' },
 };

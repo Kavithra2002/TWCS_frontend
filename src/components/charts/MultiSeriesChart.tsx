@@ -66,7 +66,7 @@ export function MultiSeriesChart({ series, height = 260, decimals = 1, leftUnit,
           axisLine={false}
           width={52}
           domain={['auto', 'auto']}
-          label={leftUnit ? { value: leftUnit, angle: -90, position: 'insideLeft', offset: 18, fill: '#64748b', fontSize: 10 } : undefined}
+          label={leftUnit ? { value: leftUnit, angle: -90, position: 'insideLeft', offset: 18, fill: '#71717a', fontSize: 10 } : undefined}
         />
         {hasRight && (
           <YAxis
@@ -76,7 +76,7 @@ export function MultiSeriesChart({ series, height = 260, decimals = 1, leftUnit,
             axisLine={false}
             width={44}
             domain={['auto', 'auto']}
-            label={rightUnit ? { value: rightUnit, angle: 90, position: 'insideRight', offset: 12, fill: '#64748b', fontSize: 10 } : undefined}
+            label={rightUnit ? { value: rightUnit, angle: 90, position: 'insideRight', offset: 12, fill: '#71717a', fontSize: 10 } : undefined}
           />
         )}
         <Tooltip
