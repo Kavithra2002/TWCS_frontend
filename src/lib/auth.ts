@@ -35,5 +35,8 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+export const roleLabel = (role: string) => (role === 'super_admin' ? 'Super admin' : role);
+
 export const canOperate = (user: User | null) => !!user && user.role !== 'VIEWER';
-export const canPlan = (user: User | null) => !!user && (user.role === 'ADMIN' || user.role === 'SUPERVISOR');
+export const canPlan = (user: User | null) =>
+  !!user && (user.role === 'super_admin' || user.role === 'ADMIN' || user.role === 'SUPERVISOR');
