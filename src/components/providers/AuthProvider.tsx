@@ -1,26 +1,54 @@
 'use client';
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { getStoredUser } from '@/lib/auth';
+import { endDevSession, getActivePersona, type DevPersona } from '@/lib/dev-personas';
 import type { User } from '@/types';
 
 interface AuthState {
   user: User | null;
+  persona: DevPersona | null;
   logout: () => void;
 }
 
-/** Local stand-in so role-gated controls stay visible while login is disabled. */
-const DEV_USER: User = {
-  id: 'dev',
-  email: 'admin@example.com',
-  name: 'System Admin',
-  role: 'ADMIN',
-};
+const AuthContext = createContext<AuthState>({
+  user: null,
+  persona: null,
+  logout: () => {},
+});
 
-const AuthContext = createContext<AuthState>({ user: DEV_USER, logout: () => {} });
-
-/** Login is bypassed for now so pages can be worked on without a session. */
+/** Restores the test user chosen on the login screen. Sends visitors without one back to login. */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  return <AuthContext.Provider value={{ user: DEV_USER, logout: () => {} }}>{children}</AuthContext.Provider>;
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [persona, setPersona] = useState<DevPersona | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (!stored) {
+      router.replace('/login');
+      return;
+    }
+    setUser(stored);
+    setPersona(getActivePersona());
+    setReady(true);
+  }, [router]);
+
+  const logout = useCallback(() => {
+    endDevSession();
+    setUser(null);
+    setPersona(null);
+    setReady(false);
+    router.replace('/login');
+  }, [router]);
+
+  if (!ready || !user) {
+    return <div className="min-h-screen bg-slate-950" />;
+  }
+
+  return <AuthContext.Provider value={{ user, persona, logout }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);
