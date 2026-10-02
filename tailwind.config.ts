@@ -5,8 +5,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Slate is driven by CSS variables so light mode can invert the scale
-        // without rewriting every component.
+        // Named "slate" in components, but the scale is a neutral zinc palette
+        // driven by CSS variables so light mode can invert it without rewrites.
         slate: {
           50: 'rgb(var(--c-50) / <alpha-value>)',
           100: 'rgb(var(--c-100) / <alpha-value>)',
