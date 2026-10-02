@@ -12,7 +12,7 @@ const internalOrigin = `http://127.0.0.1:${internalPort}`;
 
 // Compiled before the browser is allowed through, so a click does not sit
 // behind a cold Turbopack compile.
-const routes = ['/', '/troughs', '/batches', '/schedules', '/alerts', '/reports', '/settings', '/troughs/trough-01'];
+const routes = ['/login', '/', '/troughs', '/batches', '/schedules', '/alerts', '/reports', '/settings', '/troughs/trough-01'];
 
 const nextBin = path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next');
 const child = spawn(
