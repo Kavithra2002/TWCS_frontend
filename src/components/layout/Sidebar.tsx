@@ -9,6 +9,7 @@ import {
   Layers,
   Leaf,
   Settings,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -24,6 +25,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[
   { href: '/alerts', label: 'Alerts', icon: Bell, iconClass: 'bg-red-500/15 text-red-400' },
   { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/15 text-violet-400' },
   { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/15 text-indigo-400' },
+  { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/15 text-rose-400' },
 ];
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
