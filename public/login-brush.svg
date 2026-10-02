@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-80 860 C 120 760, 280 680, 460 560" stroke="#063324" stroke-width="78" stroke-opacity="0.55"/>
+    <path d="M-40 920 C 160 800, 340 700, 560 580" stroke="#0a3f2c" stroke-width="36" stroke-opacity="0.7"/>
+    <path d="M20 980 C 220 840, 400 740, 640 620" stroke="#041f16" stroke-width="22" stroke-opacity="0.8"/>
+    <path d="M-120 740 C 80 680, 240 620, 420 520" stroke="#1a6b45" stroke-width="18" stroke-opacity="0.45"/>
+    <path d="M80 860 C 260 760, 420 680, 620 560" stroke="#d7f3e4" stroke-width="6" stroke-opacity="0.35"/>
+    <path d="M-20 700 C 200 620, 380 560, 600 460" stroke="#05281c" stroke-width="14" stroke-opacity="0.55"/>
+
+    <path d="M980 420 C 1160 300, 1320 200, 1560 40" stroke="#063324" stroke-width="64" stroke-opacity="0.4"/>
+    <path d="M1040 500 C 1220 360, 1380 240, 1680 60" stroke="#041f16" stroke-width="28" stroke-opacity="0.55"/>
+    <path d="M900 360 C 1100 250, 1280 160, 1520 -20" stroke="#1f7a4e" stroke-width="16" stroke-opacity="0.4"/>
+    <path d="M1120 380 C 1280 280, 1420 180, 1620 40" stroke="#e7f8ee" stroke-width="5" stroke-opacity="0.4"/>
+    <path d="M860 480 C 1080 340, 1260 240, 1500 80" stroke="#05281c" stroke-width="12" stroke-opacity="0.45"/>
+
+    <path d="M1180 980 C 1320 860, 1460 760, 1680 620" stroke="#063324" stroke-width="70" stroke-opacity="0.42"/>
+    <path d="M1260 940 C 1400 820, 1520 720, 1720 560" stroke="#041f16" stroke-width="24" stroke-opacity="0.6"/>
+    <path d="M1100 900 C 1280 800, 1440 700, 1640 540" stroke="#2e8a5c" stroke-width="14" stroke-opacity="0.35"/>
+    <path d="M1340 900 C 1460 820, 1560 740, 1700 640" stroke="#e7f8ee" stroke-width="5" stroke-opacity="0.35"/>
+
+    <path d="M-160 280 C 40 200, 180 140, 360 40" stroke="#063324" stroke-width="48" stroke-opacity="0.35"/>
+    <path d="M-80 220 C 80 160, 220 100, 400 10" stroke="#041f16" stroke-width="16" stroke-opacity="0.5"/>
+    <path d="M-40 340 C 140 260, 280 190, 460 90" stroke="#1a6b45" stroke-width="10" stroke-opacity="0.4"/>
+
+    <path d="M520 40 C 620 120, 700 180, 820 260" stroke="#05281c" stroke-width="8" stroke-opacity="0.28"/>
+    <path d="M700 820 C 820 740, 920 680, 1060 600" stroke="#05281c" stroke-width="8" stroke-opacity="0.22"/>
+  </g>
+</svg>
