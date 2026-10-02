@@ -7,7 +7,7 @@ import { useRealtime } from '@/components/providers/RealtimeProvider';
 import { format } from 'date-fns';
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
-  const { user, logout } = useAuth();
+  const { user, persona, logout } = useAuth();
   const { connected } = useRealtime();
   const [now, setNow] = useState<Date | null>(null);
 
@@ -37,9 +37,12 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           </div>
         )}
         {user && (
-          <div className="hidden text-right md:block">
-            <p className="text-sm text-slate-100">{user.name}</p>
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">{user.role}</p>
+          <div className="hidden items-center gap-2 text-right md:flex">
+            {persona && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: persona.color }} aria-hidden />}
+            <div>
+              <p className="text-sm text-slate-100">{user.name}</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">{persona?.title ?? user.role}</p>
+            </div>
           </div>
         )}
         <button
