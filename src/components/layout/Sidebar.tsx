@@ -5,6 +5,7 @@ import {
   Bell,
   CalendarClock,
   FileBarChart,
+  Database,
   LayoutDashboard,
   Layers,
   Leaf,
@@ -26,6 +27,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[
   { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/15 text-violet-400' },
   { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/15 text-indigo-400' },
   { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/15 text-rose-400' },
+  { href: '/master-data', label: 'Master Data Dev', icon: Database, iconClass: 'bg-cyan-500/15 text-cyan-400' },
 ];
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
