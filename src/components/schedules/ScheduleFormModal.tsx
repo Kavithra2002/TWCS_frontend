@@ -1,9 +1,11 @@
 'use client';
 
 import clsx from 'clsx';
+import { CalendarClock, Clock, Gauge, Layers, Type } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { controlClass, Field, FormAlert, ToggleRow } from '@/components/ui/Field';
+import { Modal, ModalIcon } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
 import { WEEKDAY_SHORT } from '@/lib/format';
 import { SCHEDULE_ACTION_STYLE } from '@/lib/sensors';
@@ -87,9 +89,11 @@ export function ScheduleFormModal({ open, onClose, onSaved, troughs, schedule }:
       open={open}
       onClose={onClose}
       title={schedule ? 'Edit schedule' : 'New schedule'}
+      description="Choose the trough, action, and when it runs."
+      icon={<ModalIcon icon={CalendarClock} />}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={saving || !form.name || !form.troughId || form.daysOfWeek.length === 0}>
@@ -98,50 +102,60 @@ export function ScheduleFormModal({ open, onClose, onSaved, troughs, schedule }:
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label">Trough</label>
-          <select className="input" value={form.troughId} disabled={!!schedule} onChange={(e) => setForm({ ...form, troughId: e.target.value })}>
+      <div className="grid gap-3.5 sm:grid-cols-2">
+        <Field label="Trough" icon={Layers} chevron>
+          <select
+            className={controlClass({ icon: true, chevron: true })}
+            value={form.troughId}
+            disabled={!!schedule}
+            onChange={(e) => setForm({ ...form, troughId: e.target.value })}
+          >
             {troughs.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.code} — {t.name}
               </option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="label">Action</label>
-          <select className="input" value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value as ScheduleAction })}>
+        </Field>
+        <Field label="Action" icon={Gauge} chevron>
+          <select
+            className={controlClass({ icon: true, chevron: true })}
+            value={form.action}
+            onChange={(e) => setForm({ ...form, action: e.target.value as ScheduleAction })}
+          >
             {Object.entries(SCHEDULE_ACTION_STYLE).map(([k, s]) => (
               <option key={k} value={k}>
                 {s.label}
               </option>
             ))}
           </select>
-        </div>
+        </Field>
+        <Field label="Name" icon={Type} className="sm:col-span-2">
+          <input
+            className={controlClass({ icon: true })}
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Morning wither"
+          />
+        </Field>
+        <Field label="Start" icon={Clock}>
+          <input type="time" className={controlClass({ icon: true })} value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+        </Field>
+        <Field label="End" icon={Clock}>
+          <input type="time" className={controlClass({ icon: true })} value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+        </Field>
         <div className="sm:col-span-2">
-          <label className="label">Name</label>
-          <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Morning wither" />
-        </div>
-        <div>
-          <label className="label">Start</label>
-          <input type="time" className="input" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-        </div>
-        <div>
-          <label className="label">End</label>
-          <input type="time" className="input" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="label">Days</label>
+          <span className="mb-1.5 block text-[13px] font-medium text-slate-300">Days</span>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAY_SHORT.map((d, i) => (
               <button
                 key={d}
                 type="button"
+                aria-pressed={form.daysOfWeek.includes(i)}
                 onClick={() => toggleDay(i)}
                 className={clsx(
-                  'rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
-                  form.daysOfWeek.includes(i) ? 'bg-tea-600/25 text-tea-200 ring-tea-500/50' : 'text-slate-400 ring-slate-700',
+                  'rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 ring-inset transition',
+                  form.daysOfWeek.includes(i) ? 'bg-tea-600/20 text-tea-200 ring-tea-500' : 'text-slate-400 ring-slate-700 hover:ring-slate-500',
                 )}
               >
                 {d}
@@ -149,16 +163,21 @@ export function ScheduleFormModal({ open, onClose, onSaved, troughs, schedule }:
             ))}
           </div>
         </div>
-        <div>
-          <label className="label">Setpoint (optional)</label>
-          <input type="number" step="0.1" className="input" value={form.setpoint} onChange={(e) => setForm({ ...form, setpoint: e.target.value })} placeholder="e.g. 32 °C" />
+        <Field label="Setpoint (optional)" icon={Gauge}>
+          <input
+            type="number"
+            step="0.1"
+            className={controlClass({ icon: true })}
+            value={form.setpoint}
+            onChange={(e) => setForm({ ...form, setpoint: e.target.value })}
+            placeholder="e.g. 32 °C"
+          />
+        </Field>
+        <div className="flex items-end">
+          <ToggleRow checked={form.enabled} onChange={(enabled) => setForm({ ...form, enabled })} label="Enabled" />
         </div>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-300">
-          <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} className="accent-tea-500" />
-          Enabled
-        </label>
       </div>
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {error && <div className="mt-3.5"><FormAlert>{error}</FormAlert></div>}
     </Modal>
   );
 }

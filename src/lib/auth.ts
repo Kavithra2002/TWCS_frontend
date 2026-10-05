@@ -35,8 +35,26 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export const roleLabel = (role: string) => (role === 'super_admin' ? 'Super admin' : role);
+export const ASSIGNABLE_ROLES = [
+  { value: 'executive', label: 'Executive' },
+  { value: 'operation', label: 'Operation' },
+  { value: 'engineering', label: 'Engineering' },
+] as const;
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super admin',
+  executive: 'Executive',
+  operation: 'Operation',
+  engineering: 'Engineering',
+};
+
+export const roleLabel = (role: string) => ROLE_LABELS[role] ?? role;
 
 export const canOperate = (user: User | null) => !!user && user.role !== 'VIEWER';
 export const canPlan = (user: User | null) =>
-  !!user && (user.role === 'super_admin' || user.role === 'ADMIN' || user.role === 'SUPERVISOR');
+  !!user &&
+  (user.role === 'super_admin' ||
+    user.role === 'ADMIN' ||
+    user.role === 'SUPERVISOR' ||
+    user.role === 'executive' ||
+    user.role === 'engineering');

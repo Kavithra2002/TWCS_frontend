@@ -29,6 +29,34 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface ScreenView {
+  id: string;
+  screenId: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScreenAssignee {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface MasterScreen {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  views: ScreenView[];
+  assignedUsers: ScreenAssignee[];
+}
+
 export interface LatestReading {
   value: number;
   recordedAt: string;

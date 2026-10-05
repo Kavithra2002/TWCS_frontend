@@ -18,6 +18,7 @@ import { SensorChartCard } from '@/components/troughs/SensorChartCard';
 import { BatchStatusBadge, TroughStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { TIME_RANGE_OPTIONS, type TimeRange } from '@/hooks/useSeries';
@@ -34,6 +35,7 @@ export default function TroughDetailPage() {
   const { user } = useAuth();
   const [range, setRange] = useState<TimeRange>('6h');
   const [batchModal, setBatchModal] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const { data: trough, error, mutate } = useSWR<TroughWithLive>(`/troughs/${id}`);
   const { data: batches, mutate: mutateBatches } = useSWR<Batch[]>(`/batches?troughId=${id}&limit=10`);
@@ -53,7 +55,7 @@ export default function TroughDetailPage() {
       await api(`/troughs/${id}/status`, { method: 'PATCH', json: { status } });
       mutate();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Failed to update status');
+      setStatusError(e instanceof Error ? e.message : 'Failed to update status');
     }
   };
 
@@ -184,6 +186,14 @@ export default function TroughDetailPage() {
       </Card>
 
       <BatchFormModal open={batchModal} onClose={() => setBatchModal(false)} onSaved={refreshBatches} troughs={[trough]} defaultTroughId={trough.id} />
+      <ConfirmDialog
+        open={statusError !== null}
+        title="Couldn't update status"
+        description={statusError ?? ''}
+        confirmLabel="Close"
+        onConfirm={() => undefined}
+        onClose={() => setStatusError(null)}
+      />
     </>
   );
 }

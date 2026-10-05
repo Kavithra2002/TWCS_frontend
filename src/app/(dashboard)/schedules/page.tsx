@@ -8,6 +8,7 @@ import { ScheduleFormModal } from '@/components/schedules/ScheduleFormModal';
 import { ScheduleTimeline } from '@/components/schedules/ScheduleTimeline';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
@@ -25,6 +26,7 @@ export default function SchedulesPage() {
   const [day, setDay] = useState<number | null>(null);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [modal, setModal] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Schedule | null>(null);
 
   const selectedDay = day ?? today?.weekday ?? new Date().getDay();
   const isToday = today && selectedDay === today.weekday;
@@ -36,7 +38,6 @@ export default function SchedulesPage() {
   };
 
   const remove = async (s: Schedule) => {
-    if (!window.confirm(`Delete schedule "${s.name}" for ${s.troughCode}?`)) return;
     await api(`/schedules/${s.id}`, { method: 'DELETE' });
     mutate();
   };
@@ -139,7 +140,7 @@ export default function SchedulesPage() {
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => remove(s)} aria-label="Delete">
+                          <Button size="sm" variant="ghost" onClick={() => setPendingDelete(s)} aria-label="Delete">
                             <Trash2 className="h-3.5 w-3.5 text-red-400" />
                           </Button>
                         </div>
@@ -154,6 +155,15 @@ export default function SchedulesPage() {
       </Card>
 
       <ScheduleFormModal open={modal} onClose={() => setModal(false)} onSaved={() => mutate()} troughs={troughs ?? []} schedule={editing} />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete schedule"
+        description={pendingDelete ? `"${pendingDelete.name}" for ${pendingDelete.troughCode} will be removed.` : ''}
+        confirmLabel="Delete schedule"
+        danger
+        onConfirm={() => (pendingDelete ? remove(pendingDelete) : Promise.resolve())}
+        onClose={() => setPendingDelete(null)}
+      />
     </>
   );
 }
