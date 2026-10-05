@@ -1,8 +1,10 @@
 'use client';
 
+import { Clock, Droplets, Layers, Leaf, NotebookPen, Scale, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { controlClass, Field, FormAlert, ToggleRow } from '@/components/ui/Field';
+import { Modal, ModalIcon } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
 import type { Trough } from '@/types';
 
@@ -67,9 +69,11 @@ export function BatchFormModal({ open, onClose, onSaved, troughs, defaultTroughI
       open={open}
       onClose={onClose}
       title="New withering batch"
+      description="Record green leaf and start a withering run."
+      icon={<ModalIcon icon={Leaf} />}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={saving || !form.troughId}>
@@ -78,43 +82,36 @@ export function BatchFormModal({ open, onClose, onSaved, troughs, defaultTroughI
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="label">Trough</label>
-          <select className="input" value={form.troughId} onChange={set('troughId')}>
+      <div className="grid gap-3.5 sm:grid-cols-2">
+        <Field label="Trough" icon={Layers} chevron className="sm:col-span-2">
+          <select className={controlClass({ icon: true, chevron: true })} value={form.troughId} onChange={set('troughId')}>
             {troughs.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.code} — {t.name} ({t.status.toLowerCase()})
               </option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="label">Green leaf intake (kg)</label>
-          <input type="number" className="input" value={form.leafIntakeKg} onChange={set('leafIntakeKg')} />
-        </div>
-        <div>
-          <label className="label">Planned start</label>
-          <input type="datetime-local" className="input" value={form.plannedStartAt} onChange={set('plannedStartAt')} />
-        </div>
-        <div>
-          <label className="label">Initial moisture (%)</label>
-          <input type="number" step="0.1" className="input" value={form.initialMoisture} onChange={set('initialMoisture')} />
-        </div>
-        <div>
-          <label className="label">Target moisture (%)</label>
-          <input type="number" step="0.1" className="input" value={form.targetMoisture} onChange={set('targetMoisture')} />
-        </div>
+        </Field>
+        <Field label="Green leaf intake (kg)" icon={Scale}>
+          <input type="number" className={controlClass({ icon: true })} value={form.leafIntakeKg} onChange={set('leafIntakeKg')} />
+        </Field>
+        <Field label="Planned start" icon={Clock}>
+          <input type="datetime-local" className={controlClass({ icon: true })} value={form.plannedStartAt} onChange={set('plannedStartAt')} />
+        </Field>
+        <Field label="Initial moisture (%)" icon={Droplets}>
+          <input type="number" step="0.1" className={controlClass({ icon: true })} value={form.initialMoisture} onChange={set('initialMoisture')} />
+        </Field>
+        <Field label="Target moisture (%)" icon={Target}>
+          <input type="number" step="0.1" className={controlClass({ icon: true })} value={form.targetMoisture} onChange={set('targetMoisture')} />
+        </Field>
+        <Field label="Notes" icon={NotebookPen} iconAlign="top" className="sm:col-span-2">
+          <textarea className={controlClass({ icon: true, area: true })} value={form.notes} onChange={set('notes')} placeholder="Estate, leaf grade, weather…" />
+        </Field>
         <div className="sm:col-span-2">
-          <label className="label">Notes</label>
-          <textarea className="input min-h-[70px]" value={form.notes} onChange={set('notes')} placeholder="Estate, leaf grade, weather…" />
+          <ToggleRow checked={form.startNow} onChange={(startNow) => setForm({ ...form, startNow })} label="Start withering immediately" />
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
-          <input type="checkbox" checked={form.startNow} onChange={(e) => setForm({ ...form, startNow: e.target.checked })} className="accent-tea-500" />
-          Start withering immediately
-        </label>
       </div>
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {error && <div className="mt-3.5"><FormAlert>{error}</FormAlert></div>}
     </Modal>
   );
 }
