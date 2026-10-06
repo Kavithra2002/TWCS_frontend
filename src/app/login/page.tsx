@@ -66,6 +66,7 @@ function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [resetNote, setResetNote] = useState('');
 
   useEffect(() => {
@@ -78,6 +79,7 @@ function SignInForm() {
     } catch {
       /* storage unavailable */
     }
+    setSessionExpired(new URLSearchParams(window.location.search).get('expired') === '1');
   }, []);
 
   function validateEmail(value: string) {
@@ -106,7 +108,7 @@ function SignInForm() {
     try {
       const result = await api<{ token: string; user: User }>(
         '/auth/login',
-        { method: 'POST', json: { email: email.trim(), password }, live: true },
+        { method: 'POST', json: { email: email.trim(), password, remember }, live: true },
       );
       setSession(result.token, result.user);
       router.push('/');
@@ -186,6 +188,11 @@ function SignInForm() {
         Welcome back
       </h1>
       <p className="mt-2 text-center text-sm text-[#6b6b6b]">Please enter your details.</p>
+      {sessionExpired && (
+        <p className="mt-4 text-center text-sm leading-relaxed text-[#b42318]" role="alert">
+          Your session expired. Log in again to continue.
+        </p>
+      )}
 
       <form className="mt-6" onSubmit={onSignIn} noValidate>
         <div>
