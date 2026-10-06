@@ -1,4 +1,4 @@
-import { getToken } from './auth';
+import { clearSession, getToken } from './auth';
 import { USE_DEMO_DATA } from './data-source';
 import { demoRequest } from './demo-data';
 
@@ -40,6 +40,12 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
       details = data?.error?.details;
     } catch {
       /* non-JSON error body */
+    }
+    if (res.status === 401 && path !== '/auth/login') {
+      clearSession();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login?expired=1');
+      }
     }
     throw new ApiError(res.status, message, details);
   }

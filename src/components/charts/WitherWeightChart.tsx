@@ -20,9 +20,9 @@ import type { WitherSnapshotPoint } from '@/lib/moc-run';
 const WEIGHT_COLOR = '#2e9862';
 
 const OVERLAYS = [
-  { key: 'vfdHz', label: 'VFD frequency', unit: 'Hz', color: '#38bdf8', decimals: 1 },
+  { key: 'fanHz', label: 'Fan speed', unit: 'Hz', color: '#38bdf8', decimals: 1 },
   { key: 'hotLouverPct', label: 'Hot louver', unit: '%', color: '#f97316', decimals: 0 },
-  { key: 'coldLouverPct', label: 'Cold louver', unit: '%', color: '#22d3ee', decimals: 0 },
+  { key: 'ambLouverPct', label: 'Ambient louver', unit: '%', color: '#22d3ee', decimals: 0 },
 ] as const;
 
 type OverlayKey = (typeof OVERLAYS)[number]['key'];
@@ -31,9 +31,9 @@ interface Row {
   hour: number;
   file: string;
   weightKg: number;
-  vfdHz: number | null;
+  fanHz: number | null;
   hotLouverPct: number | null;
-  coldLouverPct: number | null;
+  ambLouverPct: number | null;
   /** Selected control, scaled onto the weight range so it shares the left axis. */
   overlay: number | null;
 }
@@ -58,12 +58,12 @@ function scaleOntoWeight(value: number, sourceMin: number, sourceMax: number, we
   return weightMin + t * (weightMax - weightMin);
 }
 
-export function WitherWeightChart({ points }: { points: WitherSnapshotPoint[] }) {
+export function WitherWeightChart({ points, surfaceEndHour }: { points: WitherSnapshotPoint[]; surfaceEndHour: number }) {
   const [selectedKey, setSelectedKey] = useState<OverlayKey | null>(null);
   const selected = OVERLAYS.find((item) => item.key === selectedKey) ?? null;
 
   const duration = points.length > 0 ? points[points.length - 1].hour : 14;
-  const surfaceEnd = Math.round(duration * 0.3 * 10) / 10;
+  const surfaceEnd = surfaceEndHour;
 
   const data: Row[] = useMemo(() => {
     const weights = points.map((point) => point.weightKg);
@@ -79,9 +79,9 @@ export function WitherWeightChart({ points }: { points: WitherSnapshotPoint[] })
         hour: point.hour,
         file: point.file,
         weightKg: point.weightKg,
-        vfdHz: point.vfdHz,
+        fanHz: point.fanHz,
         hotLouverPct: point.hotLouverPct,
-        coldLouverPct: point.coldLouverPct,
+        ambLouverPct: point.ambLouverPct,
         overlay: value == null || !selected ? null : scaleOntoWeight(value, sourceMin, sourceMax, weightMin, weightMax),
       };
     });
@@ -155,9 +155,9 @@ export function WitherWeightChart({ points }: { points: WitherSnapshotPoint[] })
           Weight
           {start && end ? ` ${fmtNumber(start.weightKg, 0)} → ${fmtNumber(end.weightKg, 0)} kg` : ''}
         </span>
-        <span>0–{fmtHour(surfaceEnd)} h surface moisture, fast loss{surfacePoint && start ? ` (${fmtNumber(start.weightKg - surfacePoint.weightKg, 0)} kg)` : ''}</span>
+        <span>0–{fmtHour(surfaceEnd)} h surface moisture removal{surfacePoint && start ? ` (${fmtNumber(start.weightKg - surfacePoint.weightKg, 0)} kg)` : ''}</span>
         <span>
-          {fmtHour(surfaceEnd)}–{fmtHour(duration)} h internal moisture, gradual loss
+          {fmtHour(surfaceEnd)}–{fmtHour(duration)} h internal moisture
           {surfacePoint && end ? ` (${fmtNumber(surfacePoint.weightKg - end.weightKg, 0)} kg)` : ''}
         </span>
         {selected && <span>Dotted line is normalized onto the weight scale.</span>}
@@ -187,7 +187,7 @@ export function WitherWeightChart({ points }: { points: WitherSnapshotPoint[] })
             x={surfaceEnd}
             stroke="#71717a"
             strokeDasharray="3 3"
-            label={{ value: '30%', position: 'insideTopLeft', fill: '#a1a1aa', fontSize: 10 }}
+            label={{ value: 'SMR', position: 'insideTopLeft', fill: '#a1a1aa', fontSize: 10 }}
           />
           <Line dataKey="weightKg" name="Weight" stroke={WEIGHT_COLOR} strokeWidth={2.5} dot={false} isAnimationActive={false} />
           {selected && (
