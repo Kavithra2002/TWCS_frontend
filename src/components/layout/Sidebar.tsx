@@ -6,6 +6,7 @@ import {
   CalendarClock,
   FileBarChart,
   Database,
+  FlaskConical,
   LayoutDashboard,
   LineChart,
   Layers,
@@ -20,8 +21,9 @@ import { usePathname } from 'next/navigation';
 import logo from '@/images/logo.jpeg';
 
 const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard, iconClass: 'bg-sky-500/15 text-sky-400' },
-  { href: '/dashboard-2', label: 'Dashboard 2', icon: LineChart, iconClass: 'bg-lime-500/15 text-lime-400' },
+  { href: '/', label: 'Overview', icon: LayoutDashboard, iconClass: 'bg-sky-500/15 text-sky-400' },
+  { href: '/dashboard-2', label: 'Live Monitoring', icon: LineChart, iconClass: 'bg-lime-500/15 text-lime-400' },
+  { href: '/simulator', label: 'Simulator', icon: FlaskConical, iconClass: 'bg-purple-500/15 text-purple-400' },
   { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/15 text-teal-400' },
   { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/15 text-emerald-400' },
   { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/15 text-amber-400' },
