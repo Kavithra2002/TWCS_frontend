@@ -24,7 +24,7 @@ export function WitherRunTable({ points, surfaceEndHour }: { points: WitherSnaps
     <Card
       className="mt-4"
       title="Sample table"
-      subtitle="All 168 samples. Weight is 1,500 kg times wither standard. The marked row is the sample closest to SMR done. Chart overlays are scaled onto the weight axis; these columns are the measured values."
+      subtitle={`${points.length} samples shown. Weight is 1,500 kg × wither standard. Marked row is closest to SMR done.`}
       bodyClassName="p-0"
     >
       <div className="max-h-[32rem] overflow-auto">

@@ -58,18 +58,34 @@ function scaleOntoWeight(value: number, sourceMin: number, sourceMax: number, we
   return weightMin + t * (weightMax - weightMin);
 }
 
-export function WitherWeightChart({ points, surfaceEndHour }: { points: WitherSnapshotPoint[]; surfaceEndHour: number }) {
+export function WitherWeightChart({
+  points,
+  allPoints,
+  surfaceEndHour,
+  maxHour,
+  yDomain,
+}: {
+  points: WitherSnapshotPoint[];
+  /** Full dataset — used only to lock overlay scaling so it doesn't jump as points are added. */
+  allPoints?: WitherSnapshotPoint[];
+  surfaceEndHour: number;
+  maxHour?: number;
+  /** Fixed [min, max] for the Y-axis so it doesn't rescale as points are added. */
+  yDomain?: [number, number];
+}) {
   const [selectedKey, setSelectedKey] = useState<OverlayKey | null>(null);
   const selected = OVERLAYS.find((item) => item.key === selectedKey) ?? null;
 
-  const duration = points.length > 0 ? points[points.length - 1].hour : 14;
+  const duration = maxHour ?? (points.length > 0 ? points[points.length - 1].hour : 14);
   const surfaceEnd = surfaceEndHour;
 
   const data: Row[] = useMemo(() => {
     const weights = points.map((point) => point.weightKg);
-    const weightMin = weights.length > 0 ? Math.min(...weights) : 0;
-    const weightMax = weights.length > 0 ? Math.max(...weights) : 1;
-    const raw = selected ? points.map((point) => point[selected.key]).filter((value): value is number => value != null) : [];
+    const weightMin = yDomain ? yDomain[0] : (weights.length > 0 ? Math.min(...weights) : 0);
+    const weightMax = yDomain ? yDomain[1] : (weights.length > 0 ? Math.max(...weights) : 1);
+    // Use the full dataset for overlay range so scaling stays fixed during playback.
+    const rangeSource = allPoints ?? points;
+    const raw = selected ? rangeSource.map((point) => point[selected.key]).filter((value): value is number => value != null) : [];
     const sourceMin = raw.length > 0 ? Math.min(...raw) : 0;
     const sourceMax = raw.length > 0 ? Math.max(...raw) : 1;
 
@@ -85,7 +101,7 @@ export function WitherWeightChart({ points, surfaceEndHour }: { points: WitherSn
         overlay: value == null || !selected ? null : scaleOntoWeight(value, sourceMin, sourceMax, weightMin, weightMax),
       };
     });
-  }, [points, selected]);
+  }, [points, allPoints, selected]);
 
   const start = points[0];
   const end = points[points.length - 1];
@@ -179,16 +195,18 @@ export function WitherWeightChart({ points, surfaceEndHour }: { points: WitherSn
             tickLine={false}
             axisLine={false}
             width={52}
-            domain={['auto', 'auto']}
+            domain={yDomain ?? ['auto', 'auto']}
             tickFormatter={(value: number) => fmtNumber(value, 0)}
           />
           <Tooltip content={tooltip} />
-          <ReferenceLine
-            x={surfaceEnd}
-            stroke="#71717a"
-            strokeDasharray="3 3"
-            label={{ value: 'SMR', position: 'insideTopLeft', fill: '#a1a1aa', fontSize: 10 }}
-          />
+          {end && end.hour >= surfaceEnd && (
+            <ReferenceLine
+              x={surfaceEnd}
+              stroke="#71717a"
+              strokeDasharray="3 3"
+              label={{ value: 'SMR', position: 'insideTopLeft', fill: '#a1a1aa', fontSize: 10 }}
+            />
+          )}
           <Line dataKey="weightKg" name="Weight" stroke={WEIGHT_COLOR} strokeWidth={2.5} dot={false} isAnimationActive={false} />
           {selected && (
             <Line
