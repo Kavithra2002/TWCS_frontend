@@ -1,6 +1,29 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+/** Full raw time-series snapshot as stored in the JSON file. */
+export interface TimeSeriesPoint {
+  timestamp: string;
+  ambient_rh_pct: number | null;
+  ambient_temp_c: number | null;
+  inlet_rh_pct: number | null;
+  inlet_temp_c: number | null;
+  upper_rh_pct: number | null;
+  upper_temp_c: number | null;
+  lower_rh_pct: number | null;
+  lower_temp_c: number | null;
+  chamber_pressure_pa: number | null;
+  pressure_demand_pa: number | null;
+  fan_speed_hz: number | null;
+  hot_louver_position_pct: number | null;
+  hot_louver_demand_pct: number | null;
+  amb_louver_position_pct: number | null;
+  amb_louver_demand_pct: number | null;
+  cumulative_energy_kwh: number | null;
+  current_ws_pct: number | null;
+  weight_kg: number | null;
+}
+
 /** One plotted sample from the probe time series. */
 export interface WitherSnapshotPoint {
   file: string;
@@ -90,4 +113,35 @@ export function loadWitherRun(): WitherRun {
   }
 
   return { points, surfaceEndHour };
+}
+
+/** Load every raw time-series record from time_series.json. */
+export function loadTimeSeriesPoints(): TimeSeriesPoint[] {
+  const dir = path.resolve(process.cwd(), '..', 'backend', 'moc_json');
+  const series = readJson(dir, 'time_series.json');
+  if (!Array.isArray(series)) return [];
+  return series.map((item) => {
+    const row = asRecord(item) ?? {};
+    return {
+      timestamp: (text(row.timestamp) ?? ''),
+      ambient_rh_pct: num(row.ambient_rh_pct),
+      ambient_temp_c: num(row.ambient_temp_c),
+      inlet_rh_pct: num(row.inlet_rh_pct),
+      inlet_temp_c: num(row.inlet_temp_c),
+      upper_rh_pct: num(row.upper_rh_pct),
+      upper_temp_c: num(row.upper_temp_c),
+      lower_rh_pct: num(row.lower_rh_pct),
+      lower_temp_c: num(row.lower_temp_c),
+      chamber_pressure_pa: num(row.chamber_pressure_pa),
+      pressure_demand_pa: num(row.pressure_demand_pa),
+      fan_speed_hz: num(row.fan_speed_hz),
+      hot_louver_position_pct: num(row.hot_louver_position_pct),
+      hot_louver_demand_pct: num(row.hot_louver_demand_pct),
+      amb_louver_position_pct: num(row.amb_louver_position_pct),
+      amb_louver_demand_pct: num(row.amb_louver_demand_pct),
+      cumulative_energy_kwh: num(row.cumulative_energy_kwh),
+      current_ws_pct: num(row.current_ws_pct),
+      weight_kg: num(row.weight_kg),
+    };
+  });
 }
