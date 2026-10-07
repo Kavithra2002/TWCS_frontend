@@ -29,7 +29,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Factory overview" description="Live withering conditions across all troughs" />
+      <PageHeader title="Overview" description="Live withering conditions across all troughs" />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Running troughs" value={`${kpis.troughs.running}/${kpis.troughs.total}`} icon={Layers} hint={`${kpis.troughs.idle} idle · ${kpis.troughs.maintenance} maint.`} />

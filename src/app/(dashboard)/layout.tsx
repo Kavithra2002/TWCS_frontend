@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
+import { SimulatorProvider } from '@/contexts/SimulatorContext';
 import { fetcher } from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -21,12 +22,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <SWRConfig value={{ fetcher, revalidateOnFocus: false }}>
       <AuthProvider>
         <RealtimeProvider>
-          <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} />
-          {menuOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setMenuOpen(false)} />}
-          <div className="lg:pl-60">
-            <Topbar onMenu={() => setMenuOpen(true)} />
-            <main className="mx-auto max-w-[1600px] p-4 lg:p-6">{children}</main>
-          </div>
+          <SimulatorProvider>
+            <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} />
+            {menuOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setMenuOpen(false)} />}
+            <div className="lg:pl-60">
+              <Topbar onMenu={() => setMenuOpen(true)} />
+              <main className="mx-auto max-w-[1600px] p-4 lg:p-6">{children}</main>
+            </div>
+          </SimulatorProvider>
         </RealtimeProvider>
       </AuthProvider>
     </SWRConfig>

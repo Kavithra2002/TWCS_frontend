@@ -3,9 +3,10 @@
 import clsx from 'clsx';
 import { useMemo, useState } from 'react';
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -180,7 +181,13 @@ export function WitherWeightChart({
       </div>
 
       <ResponsiveContainer width="100%" height={380}>
-        <LineChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 8 }}>
+        <AreaChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 8 }}>
+          <defs>
+            <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={WEIGHT_COLOR} stopOpacity={0.12} />
+              <stop offset="100%" stopColor={WEIGHT_COLOR} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="hour"
@@ -207,20 +214,29 @@ export function WitherWeightChart({
               label={{ value: 'SMR', position: 'insideTopLeft', fill: '#a1a1aa', fontSize: 10 }}
             />
           )}
-          <Line dataKey="weightKg" name="Weight" stroke={WEIGHT_COLOR} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+          <Area
+            dataKey="weightKg"
+            name="Weight"
+            stroke={WEIGHT_COLOR}
+            strokeWidth={2.5}
+            fill="url(#weightGrad)"
+            dot={false}
+            isAnimationActive={false}
+          />
           {selected && (
-            <Line
+            <Area
               dataKey="overlay"
               name={selected.label}
               stroke={selected.color}
               strokeWidth={2}
               strokeDasharray="6 4"
+              fill="none"
               dot={false}
               connectNulls
               isAnimationActive={false}
             />
           )}
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </Card>
   );
