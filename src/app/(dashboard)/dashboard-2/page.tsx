@@ -9,7 +9,7 @@ export default function Dashboard2Page() {
   return (
     <>
       <PageHeader
-        title="Dashboard 2"
+        title="Live Monitoring"
         description="Waltrim trough 16, 23–24 Jul 2025. Weight is starting weight times current wither standard. The marker is SMR done / IMR1 start."
       />
       <WitheringSessionPanel
