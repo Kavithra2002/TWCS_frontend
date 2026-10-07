@@ -92,6 +92,28 @@ body {
   }
 }
 
+/* Running-card — modern lifted 3-D look (dark mode default) */
+.running-glow {
+  border-color: rgba(34,197,94,0.30) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),   /* top-edge shine  */
+    0 2px 4px  rgba(0,0,0,0.40),             /* close shadow    */
+    0 8px 24px rgba(0,0,0,0.45),             /* depth layer     */
+    0 1px 0    rgba(34,197,94,0.20);         /* green underline */
+  transform: translateY(-2px);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+/* Light-mode override: softer shadows, stronger green accent */
+html.light .running-glow {
+  border-color: rgba(34,197,94,0.40) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.80),
+    0 2px 4px  rgba(0,0,0,0.08),
+    0 8px 20px rgba(0,0,0,0.10),
+    0 1px 0    rgba(34,197,94,0.25);
+}
+
 /* Recharts tweaks for the dark theme */
 .recharts-cartesian-grid line {
   stroke: var(--chart-grid);

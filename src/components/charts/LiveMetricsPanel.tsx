@@ -35,27 +35,41 @@ function fmtTs(iso: string): string {
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const W = 100, H = 16;
+  const W = 100, H = 20;
   if (data.length < 2) return <div style={{ height: H }} />;
   const min = Math.min(...data), max = Math.max(...data);
   const span = max - min || 1;
-  const pts = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * W;
-      const y = H - 1 - ((v - min) / span) * (H - 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+  const coords = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * W,
+    y: H - 2 - ((v - min) / span) * (H - 4),
+  }));
+  const linePts = coords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  // Close the polygon along the bottom edge for the filled area
+  const fillPts = [
+    ...coords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+    `${W},${H}`,
+    `0,${H}`,
+  ].join(' ');
+  const gradId = `sg-${color.replace('#', '')}`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {/* filled area */}
+      <polygon points={fillPts} fill={`url(#${gradId})`} />
+      {/* line on top */}
       <polyline
-        points={pts}
+        points={linePts}
         fill="none"
         stroke={color}
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={0.55}
+        opacity={0.75}
       />
     </svg>
   );
@@ -102,8 +116,6 @@ interface SensorDef {
   dec: number;
   color: string;
   icon: LucideIcon;
-  rangeMin: number;
-  rangeMax: number;
 }
 
 function LiveSensorTile({
@@ -115,50 +127,30 @@ function LiveSensorTile({
   curr: TimeSeriesPoint;
   history: number[];
 }) {
-  const { mkey, label, unit, dec, color, icon: Icon, rangeMin, rangeMax } = def;
+  const { mkey, label, unit, dec, color, icon: Icon } = def;
   const value = curr[mkey] as number | null;
-  const pos =
-    value !== null
-      ? Math.min(100, Math.max(0, ((value - rangeMin) / (rangeMax - rangeMin)) * 100))
-      : null;
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-      {/* label row */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs text-slate-400">
-          <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />
+    <div className="rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2">
+      {/* label + dot */}
+      <div className="flex items-center justify-between gap-1">
+        <span className="flex items-center gap-1 text-[11px] text-slate-400">
+          <Icon className="h-3 w-3 shrink-0" style={{ color }} />
           {label}
         </span>
         <span
-          className="h-2 w-2 shrink-0 rounded-full"
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: value !== null ? color : '#475569' }}
         />
       </div>
 
       {/* value */}
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-50">
+      <p className="mt-0.5 text-lg font-semibold tabular-nums leading-tight text-slate-50">
         {fmtNumber(value, dec)}
-        <span className="ml-1 text-xs font-normal text-slate-500">{unit}</span>
+        <span className="ml-0.5 text-[11px] font-normal text-slate-500">{unit}</span>
       </p>
 
-      {/* range bar + tick */}
-      <div className="relative mt-2 h-1.5 rounded-full bg-slate-800">
-        {pos !== null && (
-          <div
-            className="absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{ left: `${pos}%`, backgroundColor: color }}
-          />
-        )}
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-600">
-        <span>{rangeMin}</span>
-        <span>
-          {rangeMax} {unit}
-        </span>
-      </div>
-
-      {/* sparkline */}
+      {/* live sparkline */}
       <div className="mt-1">
         <Sparkline data={history} color={color} />
       </div>
@@ -169,30 +161,30 @@ function LiveSensorTile({
 // ─── Sensor group definitions ─────────────────────────────────────────────────
 
 const ENV_SENSORS: SensorDef[] = [
-  { mkey: 'ambient_rh_pct',  label: 'Ambient RH',   unit: '%',  dec: 1, color: '#38bdf8', icon: Droplets,   rangeMin: 30,  rangeMax: 100 },
-  { mkey: 'ambient_temp_c',  label: 'Ambient Temp', unit: '°C', dec: 1, color: '#fb923c', icon: Thermometer, rangeMin: 15,  rangeMax: 40  },
-  { mkey: 'inlet_rh_pct',   label: 'Inlet RH',     unit: '%',  dec: 1, color: '#7dd3fc', icon: Droplets,   rangeMin: 30,  rangeMax: 100 },
-  { mkey: 'inlet_temp_c',   label: 'Inlet Temp',   unit: '°C', dec: 1, color: '#fdba74', icon: Thermometer, rangeMin: 15,  rangeMax: 40  },
+  { mkey: 'ambient_rh_pct',  label: 'Ambient RH',   unit: '%',  dec: 1, color: '#38bdf8', icon: Droplets    },
+  { mkey: 'ambient_temp_c',  label: 'Ambient Temp', unit: '°C', dec: 1, color: '#fb923c', icon: Thermometer },
+  { mkey: 'inlet_rh_pct',   label: 'Inlet RH',     unit: '%',  dec: 1, color: '#7dd3fc', icon: Droplets    },
+  { mkey: 'inlet_temp_c',   label: 'Inlet Temp',   unit: '°C', dec: 1, color: '#fdba74', icon: Thermometer },
 ];
 
 const CHAMBER_SENSORS: SensorDef[] = [
-  { mkey: 'upper_rh_pct',  label: 'Upper RH',   unit: '%',  dec: 1, color: '#34d399', icon: Droplets,   rangeMin: 30,  rangeMax: 100 },
-  { mkey: 'upper_temp_c',  label: 'Upper Temp', unit: '°C', dec: 1, color: '#6ee7b7', icon: Thermometer, rangeMin: 15,  rangeMax: 40  },
-  { mkey: 'lower_rh_pct',  label: 'Lower RH',   unit: '%',  dec: 1, color: '#10b981', icon: Droplets,   rangeMin: 30,  rangeMax: 100 },
-  { mkey: 'lower_temp_c',  label: 'Lower Temp', unit: '°C', dec: 1, color: '#a7f3d0', icon: Thermometer, rangeMin: 15,  rangeMax: 40  },
+  { mkey: 'upper_rh_pct',  label: 'Upper RH',   unit: '%',  dec: 1, color: '#34d399', icon: Droplets    },
+  { mkey: 'upper_temp_c',  label: 'Upper Temp', unit: '°C', dec: 1, color: '#6ee7b7', icon: Thermometer },
+  { mkey: 'lower_rh_pct',  label: 'Lower RH',   unit: '%',  dec: 1, color: '#10b981', icon: Droplets    },
+  { mkey: 'lower_temp_c',  label: 'Lower Temp', unit: '°C', dec: 1, color: '#a7f3d0', icon: Thermometer },
 ];
 
 const ACTUATOR_SENSORS: SensorDef[] = [
-  { mkey: 'fan_speed_hz',            label: 'Fan Speed',      unit: 'Hz', dec: 0, color: '#4ade80', icon: Wind,             rangeMin: 0,  rangeMax: 60  },
-  { mkey: 'hot_louver_position_pct', label: 'Hot Louver Pos', unit: '%',  dec: 0, color: '#f97316', icon: SlidersHorizontal, rangeMin: 0,  rangeMax: 100 },
-  { mkey: 'hot_louver_demand_pct',   label: 'Hot Louver Dem', unit: '%',  dec: 0, color: '#fdba74', icon: SlidersHorizontal, rangeMin: 0,  rangeMax: 100 },
-  { mkey: 'amb_louver_position_pct', label: 'Amb Louver Pos', unit: '%',  dec: 0, color: '#22d3ee', icon: SlidersHorizontal, rangeMin: 0,  rangeMax: 100 },
-  { mkey: 'amb_louver_demand_pct',   label: 'Amb Louver Dem', unit: '%',  dec: 0, color: '#67e8f9', icon: SlidersHorizontal, rangeMin: 0,  rangeMax: 100 },
+  { mkey: 'fan_speed_hz',            label: 'Fan Speed',      unit: 'Hz', dec: 0, color: '#4ade80', icon: Wind             },
+  { mkey: 'hot_louver_position_pct', label: 'Hot Louver Pos', unit: '%',  dec: 0, color: '#f97316', icon: SlidersHorizontal },
+  { mkey: 'hot_louver_demand_pct',   label: 'Hot Louver Dem', unit: '%',  dec: 0, color: '#fdba74', icon: SlidersHorizontal },
+  { mkey: 'amb_louver_position_pct', label: 'Amb Louver Pos', unit: '%',  dec: 0, color: '#22d3ee', icon: SlidersHorizontal },
+  { mkey: 'amb_louver_demand_pct',   label: 'Amb Louver Dem', unit: '%',  dec: 0, color: '#67e8f9', icon: SlidersHorizontal },
 ];
 
 const PRESSURE_SENSORS: SensorDef[] = [
-  { mkey: 'chamber_pressure_pa', label: 'Chamber',  unit: 'Pa', dec: 1, color: '#a78bfa', icon: Activity, rangeMin: -20, rangeMax: 300 },
-  { mkey: 'pressure_demand_pa',  label: 'Demand',   unit: 'Pa', dec: 1, color: '#c4b5fd', icon: Activity, rangeMin: -20, rangeMax: 300 },
+  { mkey: 'chamber_pressure_pa', label: 'Chamber', unit: 'Pa', dec: 1, color: '#a78bfa', icon: Activity },
+  { mkey: 'pressure_demand_pa',  label: 'Demand',  unit: 'Pa', dec: 1, color: '#c4b5fd', icon: Activity },
 ];
 
 // ─── Playback speed options ───────────────────────────────────────────────────
