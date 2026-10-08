@@ -27,12 +27,21 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-[#0d3b2c] text-[#1a1a1a]" style={{ colorScheme: 'light' }}>
+    <main className="relative h-dvh overflow-hidden text-[#1a1a1a]" style={{ colorScheme: 'light' }}>
+      {/* Full-page tea garden background */}
       <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <img src="/login-brush.svg" alt="" className="h-full w-full object-cover" />
+        <img src="/tea-bg.jpg" alt="" className="h-full w-full object-cover object-[center_40%]" />
+        {/* Soft overlay to lighten the mid-tones so the white glass card pops */}
+        <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
       </div>
       <div className="relative flex h-full items-center justify-center px-6">
-        <div className="grid w-full max-w-[810px] overflow-hidden rounded-[28px] bg-white p-2.5 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.55)] sm:grid-cols-2">
+        {/* Glass login card */}
+        <div className="grid w-full max-w-[810px] overflow-hidden rounded-[28px] p-2.5
+                        shadow-[0_24px_80px_rgba(0,0,0,0.22)]
+                        backdrop-blur-2xl
+                        bg-white/60
+                        border border-white/80
+                        sm:grid-cols-2">
           <div className="flex items-center justify-center px-6 py-8 sm:px-8">
             <SignInForm />
           </div>
