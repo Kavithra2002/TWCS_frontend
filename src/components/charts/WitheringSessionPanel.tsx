@@ -34,7 +34,7 @@ export function WitheringSessionPanel({ timeSeriesPoints, chartPoints, surfaceEn
 
   return (
     <>
-      <LiveMetricsPanel points={timeSeriesPoints} idx={idx} onIdxChange={setIdx} />
+      <LiveMetricsPanel points={timeSeriesPoints} idx={idx} onIdxChange={setIdx} showControls />
       <WitherWeightChart
         points={visibleChartPoints}
         allPoints={chartPoints}

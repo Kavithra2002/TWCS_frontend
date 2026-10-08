@@ -12,7 +12,8 @@ import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
-import { TroughCard } from '@/components/troughs/TroughCard';
+import { SimTroughOfflineRow, SimTroughRunningCard } from '@/components/troughs/SimTroughOverviewCard';
+import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
 import { TIME_RANGE_OPTIONS, useSeries, type TimeRange } from '@/hooks/useSeries';
 import { fmtNumber } from '@/lib/format';
 import { SCHEDULE_ACTION_STYLE, SENSOR_META, TROUGH_STATUS_STYLE } from '@/lib/sensors';
@@ -20,6 +21,7 @@ import type { DashboardOverview, TodaySchedules, TroughWithLive } from '@/types'
 
 export default function DashboardPage() {
   const { data, error } = useSWR<DashboardOverview>('/dashboard/overview', { refreshInterval: 30_000 });
+  const { state: simState } = useSimulator();
 
   if (error) return <ErrorState error={error} />;
   if (!data) return <Loading label="Loading dashboard…" />;
@@ -27,12 +29,18 @@ export default function DashboardPage() {
   const { kpis } = data;
   const avg = kpis.averages;
 
+  const simTroughs = Object.values(simState.troughs);
+  const simRunning = simTroughs.filter((t) => t.running).length;
+  const simPaused  = simTroughs.filter((t) => !t.running && t.idx > 0).length;
+  const simReady   = simTroughs.filter((t) => !t.running && t.idx === 0).length;
+  const simTotal   = simTroughs.length;
+
   return (
     <>
       <PageHeader title="Overview" description="Live withering conditions across all troughs" />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <KpiCard label="Running troughs" value={`${kpis.troughs.running}/${kpis.troughs.total}`} icon={Layers} hint={`${kpis.troughs.idle} idle · ${kpis.troughs.maintenance} maint.`} />
+        <KpiCard label="Running troughs" value={`${simRunning}/${simTotal}`} icon={Layers} hint={`${simPaused} paused · ${simReady} ready`} />
         <KpiCard label="Avg air temp" value={fmtNumber(avg.airTemperature)} unit="°C" icon={Thermometer} color={SENSOR_META.AIR_TEMPERATURE.color} hint={`Leaf ${fmtNumber(avg.leafTemperature)} °C`} />
         <KpiCard label="Avg humidity" value={fmtNumber(avg.humidity)} unit="%RH" icon={Droplets} color={SENSOR_META.HUMIDITY.color} />
         <KpiCard label="Avg leaf moisture" value={fmtNumber(avg.leafMoisture)} unit="%" icon={Leaf} color={SENSOR_META.LEAF_MOISTURE.color} />
@@ -42,12 +50,19 @@ export default function DashboardPage() {
 
       <div className="mt-4 grid items-start gap-4 xl:grid-cols-3 xl:items-stretch">
         <div className="space-y-4 xl:col-span-2">
-          <Card title="Withering troughs" subtitle="Live readings · click a trough for details">
-            <div className="grid gap-3 md:grid-cols-2">
-              {data.troughs.map((t) => (
-                <TroughCard key={t.id} trough={t} activeBatch={t.activeBatch} />
-              ))}
-            </div>
+          <Card
+            title="Withering troughs"
+            subtitle={
+              simState.loaded
+                ? `${simTotal} troughs · ${simRunning} running`
+                : 'Loading simulator data…'
+            }
+          >
+            {!simState.loaded ? (
+              <Loading />
+            ) : (
+              <TroughList troughs={simTroughs} />
+            )}
           </Card>
           <ClimateTrend troughs={data.troughs} />
         </div>
@@ -55,14 +70,22 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-4 xl:min-h-0">
           <Card title="Trough status">
             <StatusDonut
-              centerValue={String(kpis.troughs.total)}
+              centerValue={String(simTotal || kpis.troughs.total)}
               centerLabel="troughs"
-              slices={[
-                { name: 'Running', value: kpis.troughs.running, color: TROUGH_STATUS_STYLE.RUNNING.color },
-                { name: 'Idle', value: kpis.troughs.idle, color: TROUGH_STATUS_STYLE.IDLE.color },
-                { name: 'Maintenance', value: kpis.troughs.maintenance, color: TROUGH_STATUS_STYLE.MAINTENANCE.color },
-                { name: 'Offline', value: kpis.troughs.offline, color: TROUGH_STATUS_STYLE.OFFLINE.color },
-              ]}
+              legend
+              slices={
+                simTotal > 0
+                  ? [
+                      { name: 'Online',  value: simRunning, color: TROUGH_STATUS_STYLE.RUNNING.color },
+                      { name: 'Paused',  value: simPaused,  color: TROUGH_STATUS_STYLE.IDLE.color },
+                      { name: 'Offline', value: simReady,   color: '#ef4444' },
+                    ]
+                  : [
+                      { name: 'Online',  value: kpis.troughs.running,     color: TROUGH_STATUS_STYLE.RUNNING.color },
+                      { name: 'Idle',    value: kpis.troughs.idle,        color: TROUGH_STATUS_STYLE.IDLE.color },
+                      { name: 'Offline', value: kpis.troughs.offline + kpis.troughs.maintenance, color: '#ef4444' },
+                    ]
+              }
             />
           </Card>
           <Card title="Open alerts" action={<Link href="/alerts" className="text-xs text-tea-400 hover:text-tea-300">All alerts</Link>}>
@@ -72,6 +95,44 @@ export default function DashboardPage() {
         </div>
       </div>
     </>
+  );
+}
+
+// ── Trough list: running = full cards, offline = compact rows ─────────────────
+function TroughList({ troughs }: { troughs: SimTroughState[] }) {
+  const active  = troughs.filter((t) => t.running || t.idx > 0);
+  const offline = troughs.filter((t) => !t.running && t.idx === 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Full cards for running / paused troughs */}
+      {active.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {active.map((t) => (
+            <SimTroughRunningCard key={t.data.id} troughState={t} />
+          ))}
+        </div>
+      )}
+
+      {/* Compact offline rows */}
+      {offline.length > 0 && (
+        <div className="space-y-1.5">
+          {active.length > 0 && (
+            <p className="text-[10px] uppercase tracking-widest text-slate-600 px-1 pt-1">
+              Offline · {offline.length}
+            </p>
+          )}
+          {offline.map((t) => (
+            <SimTroughOfflineRow key={t.data.id} troughState={t} />
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {active.length === 0 && offline.length === 0 && (
+        <p className="py-6 text-center text-sm text-slate-600">No trough data available</p>
+      )}
+    </div>
   );
 }
 

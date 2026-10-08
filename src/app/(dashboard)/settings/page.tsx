@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Save } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { AlertsPanel } from '@/components/alerts/AlertsPanel';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -22,13 +23,14 @@ export default function SettingsPage() {
     if (!troughId && troughs?.length) setTroughId(troughs[0].id);
   }, [troughs, troughId]);
 
-  const trough = troughs?.find((t) => t.id === troughId);
+  const trough   = troughs?.find((t) => t.id === troughId);
   const editable = canPlan(user);
 
   return (
     <>
       <PageHeader title="Settings" description="Alert thresholds, account and device integration" />
 
+      {/* ── Top section: thresholds + account/device ── */}
       <div className="grid gap-4 xl:grid-cols-3">
         <Card
           title="Sensor alert thresholds"
@@ -37,9 +39,7 @@ export default function SettingsPage() {
           action={
             <select className="input w-auto py-1 text-xs" value={troughId} onChange={(e) => setTroughId(e.target.value)}>
               {troughs?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.code}
-                </option>
+                <option key={t.id} value={t.id}>{t.code}</option>
               ))}
             </select>
           }
@@ -72,9 +72,9 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <Card title="Account">
             <dl className="space-y-2 text-sm">
-              <Row label="Name" value={user?.name} />
+              <Row label="Name"  value={user?.name} />
               <Row label="Email" value={user?.email} />
-              <Row label="Role" value={user ? roleLabel(user.role) : undefined} />
+              <Row label="Role"  value={user ? roleLabel(user.role) : undefined} />
             </dl>
           </Card>
           <Card title="Device integration" subtitle="How PLCs / IoT gateways push readings">
@@ -94,9 +94,20 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      {/* ── Alerts section below ── */}
+      <div className="mt-6 space-y-1">
+        <h2 className="text-base font-semibold text-slate-100">Alerts</h2>
+        <p className="text-sm text-slate-500">Threshold breaches from live sensors and simulator phase transitions</p>
+      </div>
+      <div className="mt-3">
+        <AlertsPanel />
+      </div>
     </>
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (

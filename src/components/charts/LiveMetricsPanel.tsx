@@ -201,10 +201,12 @@ export function LiveMetricsPanel({
   points,
   idx,
   onIdxChange,
+  showControls = true,
 }: {
   points: TimeSeriesPoint[];
   idx: number;
-  onIdxChange: (i: number) => void;
+  onIdxChange?: (i: number) => void;
+  showControls?: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(0);
@@ -249,13 +251,13 @@ export function LiveMetricsPanel({
   return (
     <>
       {/* ── Playback controls ───────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
+      {showControls && <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* nav buttons */}
           <button
             type="button"
             title="First"
-            onClick={() => { setPlaying(false); onIdxChange(0); }}
+            onClick={() => { setPlaying(false); onIdxChange?.(0); }}
             className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700 transition"
           >
             ⏮
@@ -263,7 +265,7 @@ export function LiveMetricsPanel({
           <button
             type="button"
             title="Step back"
-            onClick={() => { setPlaying(false); onIdxChange(Math.max(0, idx - 1)); }}
+            onClick={() => { setPlaying(false); onIdxChange?.(Math.max(0, idx - 1)); }}
             className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700 transition"
           >
             ◀
@@ -278,7 +280,7 @@ export function LiveMetricsPanel({
           <button
             type="button"
             title="Step forward"
-            onClick={() => { setPlaying(false); onIdxChange(Math.min(points.length - 1, idx + 1)); }}
+            onClick={() => { setPlaying(false); onIdxChange?.(Math.min(points.length - 1, idx + 1)); }}
             className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700 transition"
           >
             ▶
@@ -286,7 +288,7 @@ export function LiveMetricsPanel({
           <button
             type="button"
             title="Last"
-            onClick={() => { setPlaying(false); onIdxChange(points.length - 1); }}
+            onClick={() => { setPlaying(false); onIdxChange?.(points.length - 1); }}
             className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700 transition"
           >
             ⏭
@@ -330,7 +332,7 @@ export function LiveMetricsPanel({
             min={0}
             max={points.length - 1}
             value={idx}
-            onChange={(e) => { setPlaying(false); onIdxChange(Number(e.target.value)); }}
+            onChange={(e) => { setPlaying(false); onIdxChange?.(Number(e.target.value)); }}
             className="w-full cursor-pointer"
             style={{ accentColor: '#38bdf8' }}
           />
@@ -342,7 +344,7 @@ export function LiveMetricsPanel({
             <span>{points[points.length - 1]?.timestamp.slice(11, 16)}</span>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* ── KPI summary row ─────────────────────────────────────────────── */}
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

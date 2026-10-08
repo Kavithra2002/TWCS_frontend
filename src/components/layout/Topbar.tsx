@@ -4,6 +4,7 @@ import { LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useRealtime } from '@/components/providers/RealtimeProvider';
+import { AlertDropdown } from '@/components/layout/AlertDropdown';
 import { format } from 'date-fns';
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
@@ -42,6 +43,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             <p className="text-[11px] text-slate-500">{user.email}</p>
           </div>
         )}
+        <AlertDropdown />
         <button
           onClick={() => {
             const next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
