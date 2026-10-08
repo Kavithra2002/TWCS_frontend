@@ -265,13 +265,6 @@ export default function SimulatorPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={stopSelected}
-                  className="flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-sm font-bold text-amber-400 transition hover:bg-amber-500/20"
-                >
-                  <Pause className="h-3.5 w-3.5" /> Stop {selCount}
-                </button>
-                <button
-                  type="button"
                   onClick={clearSelection}
                   className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-400 transition hover:bg-slate-700"
                 >
