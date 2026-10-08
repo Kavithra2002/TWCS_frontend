@@ -174,14 +174,15 @@ export function TroughRingCard({
     sub:        isDark ? '#cbd5e1' : '#475569',
     muted:      isDark ? '#94a3b8' : '#64748b',
     dimText:    isDark ? '#64748b' : '#94a3b8',
-    divider:    isDark ? '#1e293b' : '#e2e8f0',
-    cardBg:     isDark ? '#0f172a' : '#ffffff',
+    divider:    isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+    /* glass-matching — semi-transparent so the background photo shows through */
+    cardBg:     isDark ? 'rgba(6,14,22,0.52)' : 'rgba(255,255,255,0.58)',
     cardBorder: running
-      ? (isDark ? 'rgba(34,197,94,0.30)' : 'rgba(34,197,94,0.40)')
-      : isDark ? '#1e293b' : '#e2e8f0',
+      ? (isDark ? 'rgba(34,197,94,0.35)' : 'rgba(34,197,94,0.45)')
+      : isDark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.80)',
     statusBg: running
-      ? (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.10)')
-      : (isDark ? '#1e293b' : '#f1f5f9'),
+      ? (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.12)')
+      : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
     statusText: running          ? (isDark ? '#4ade80' : '#16a34a')
       : phase === 'DONE'         ? '#64748b'
       : started                  ? (isDark ? '#f59e0b' : '#d97706')
@@ -201,6 +202,11 @@ export function TroughRingCard({
       style={{
         backgroundColor: clr.cardBg,
         borderColor: clr.cardBorder,
+        backdropFilter: 'blur(24px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+        boxShadow: isDark
+          ? '0 4px 6px rgba(0,0,0,0.25), 0 12px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)'
+          : '0 4px 6px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.95)',
       }}
     >
       {/* Animated top accent line when running */}
