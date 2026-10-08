@@ -16,13 +16,16 @@ export function KpiCard({ label, value, unit, hint, icon: Icon, color = '#2e9862
   return (
     <div
       className={clsx(
-        'rounded-xl border bg-slate-900/60 p-4',
-        alert ? 'border-red-500/40 shadow-[0_0_0_1px_rgba(239,68,68,0.15)]' : 'border-slate-800',
+        'glass rounded-2xl p-4 transition-transform duration-200 hover:-translate-y-0.5',
+        alert && 'ring-1 ring-red-500/40',
       )}
     >
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}22` }}>
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-xl"
+          style={{ backgroundColor: `${color}28` }}
+        >
           <Icon className="h-4 w-4" style={{ color }} />
         </span>
       </div>

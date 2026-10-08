@@ -25,7 +25,7 @@ export function TroughCard({ trough, activeBatch, sensorTypes = DEFAULT_TYPES }:
   return (
     <Link
       href={`/troughs/${trough.id}`}
-      className="group block h-full rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-tea-600/60 hover:bg-slate-900"
+      className="group glass block h-full rounded-2xl p-4 transition hover:-translate-y-0.5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div>
@@ -47,7 +47,7 @@ export function TroughCard({ trough, activeBatch, sensorTypes = DEFAULT_TYPES }:
       </div>
 
       {activeBatch && (
-        <div className="mt-3 border-t border-slate-800 pt-3">
+        <div className="mt-3 border-t border-white/[0.08] pt-3">
           <MoistureProgress batch={activeBatch} currentMoisture={liveMoisture?.value} />
         </div>
       )}

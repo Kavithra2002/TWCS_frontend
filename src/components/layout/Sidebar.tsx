@@ -20,16 +20,16 @@ import { usePathname } from 'next/navigation';
 import logo from '@/images/logo.jpeg';
 
 const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[] = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, iconClass: 'bg-sky-500/15 text-sky-400' },
-  { href: '/dashboard-2', label: 'Live Monitoring', icon: LineChart, iconClass: 'bg-lime-500/15 text-lime-400' },
-  { href: '/simulator', label: 'Simulator', icon: FlaskConical, iconClass: 'bg-purple-500/15 text-purple-400' },
-  { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/15 text-teal-400' },
-  { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/15 text-emerald-400' },
-  { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/15 text-amber-400' },
-  { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/15 text-violet-400' },
-  { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/15 text-indigo-400' },
-  { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/15 text-rose-400' },
-  { href: '/master-data', label: 'Master Data Dev', icon: Database, iconClass: 'bg-cyan-500/15 text-cyan-400' },
+  { href: '/', label: 'Overview', icon: LayoutDashboard, iconClass: 'bg-sky-500/20 text-sky-400' },
+  { href: '/dashboard-2', label: 'Live Monitoring', icon: LineChart, iconClass: 'bg-lime-500/20 text-lime-400' },
+  { href: '/simulator', label: 'Simulator', icon: FlaskConical, iconClass: 'bg-purple-500/20 text-purple-400' },
+  { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/20 text-teal-400' },
+  { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/20 text-emerald-400' },
+  { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/20 text-amber-400' },
+  { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/20 text-violet-400' },
+  { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/20 text-indigo-400' },
+  { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/20 text-rose-400' },
+  { href: '/master-data', label: 'Master Data Dev', icon: Database, iconClass: 'bg-cyan-500/20 text-cyan-400' },
 ];
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
@@ -39,34 +39,38 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
   return (
     <aside
       className={clsx(
-        'fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-slate-800 bg-slate-950 transition-transform lg:translate-x-0',
+        /* 12 px gap from every viewport edge — the sidebar floats */
+        'fixed bottom-3 left-3 top-3 z-40 flex w-60 flex-col transition-transform lg:translate-x-0',
+        'glass rounded-2xl',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
-      <div className="border-b border-slate-800 px-3 py-3">
+      {/* Logo */}
+      <div className="border-b border-black/10 px-3 py-3">
         <Image
           src={logo}
           alt="TWCS — Tea Withering Control System"
           priority
           sizes="216px"
-          className="h-auto w-full rounded-md bg-white"
+          className="h-auto w-full rounded-md"
         />
       </div>
 
-      <nav className="flex-1 space-y-0.5 p-3">
+      {/* Navigation */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {NAV.map(({ href, label, icon: Icon, iconClass }) => (
           <Link
             key={href}
             href={href}
             onClick={onNavigate}
             className={clsx(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+              'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-150',
               isActive(href)
-                ? 'bg-tea-600/15 text-tea-300'
-                : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
+                ? 'bg-white font-bold text-[#111827] shadow-[0_2px_8px_rgba(0,0,0,0.18)]'
+                : 'font-medium text-[#111827] hover:bg-white/20',
             )}
           >
-            <span className={clsx('flex h-6 w-6 shrink-0 items-center justify-center rounded-md', iconClass)}>
+            <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', iconClass)}>
               <Icon className="h-3.5 w-3.5" />
             </span>
             {label}
@@ -74,7 +78,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         ))}
       </nav>
 
-      <div className="border-t border-slate-800 p-4 text-[11px] text-slate-600">TWCS v0.1.0</div>
+      <div className="shrink-0 border-t border-black/10 px-4 py-3 text-[11px] text-[#111827]/50">TWCS v0.1.0</div>
     </aside>
   );
 }

@@ -223,7 +223,7 @@ export function LiveMetricsPanel({
           setPlaying(false);
           return;
         }
-        onIdxChange(next);
+        onIdxChange?.(next);
       }, SPEEDS[speedIdx].ms);
     } else {
       clearInterval(timerRef.current);

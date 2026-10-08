@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Sky: deep purple → blue → pale cyan at horizon -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0d0922"/>
+      <stop offset="18%"  stop-color="#1a1248"/>
+      <stop offset="40%"  stop-color="#243a7a"/>
+      <stop offset="62%"  stop-color="#3a6aaa"/>
+      <stop offset="78%"  stop-color="#6fa0c8"/>
+      <stop offset="90%"  stop-color="#a8cce0"/>
+      <stop offset="100%" stop-color="#c8def0"/>
+    </linearGradient>
+
+    <!-- Stars cluster overlay -->
+    <radialGradient id="starglow" cx="50%" cy="20%" r="50%">
+      <stop offset="0%"   stop-color="rgba(200,210,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(200,210,255,0)"/>
+    </radialGradient>
+
+    <!-- Horizon atmospheric glow -->
+    <radialGradient id="horiGlow" cx="50%" cy="100%" r="70%">
+      <stop offset="0%"   stop-color="rgba(160,195,235,0.55)"/>
+      <stop offset="60%"  stop-color="rgba(130,170,220,0.20)"/>
+      <stop offset="100%" stop-color="rgba(100,140,200,0)"/>
+    </radialGradient>
+
+    <!-- Far mountains fill -->
+    <linearGradient id="farMtnFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#3a5880"/>
+      <stop offset="50%"  stop-color="#2e4868"/>
+      <stop offset="100%" stop-color="#223a58"/>
+    </linearGradient>
+
+    <!-- Snow caps -->
+    <linearGradient id="snow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#deeef8"/>
+      <stop offset="60%"  stop-color="rgba(220,238,248,0.4)"/>
+      <stop offset="100%" stop-color="rgba(220,238,248,0)"/>
+    </linearGradient>
+
+    <!-- Mid-range green mountains (tea estate) -->
+    <linearGradient id="midMtn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#1f4028"/>
+      <stop offset="55%"  stop-color="#152e1c"/>
+      <stop offset="100%" stop-color="#0c1e10"/>
+    </linearGradient>
+
+    <!-- Mid-right lighter mountain (catching light) -->
+    <linearGradient id="midMtnLight" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%"   stop-color="#2a5535"/>
+      <stop offset="100%" stop-color="#152e1c"/>
+    </linearGradient>
+
+    <!-- Foreground rolling hills -->
+    <linearGradient id="fgHill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#152a18"/>
+      <stop offset="100%" stop-color="#080f09"/>
+    </linearGradient>
+
+    <!-- Ground/base -->
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0c1a0e"/>
+      <stop offset="100%" stop-color="#040807"/>
+    </linearGradient>
+
+    <!-- Lake reflection -->
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="rgba(90,140,200,0.60)"/>
+      <stop offset="40%"  stop-color="rgba(60,110,170,0.45)"/>
+      <stop offset="100%" stop-color="rgba(20,40,80,0.70)"/>
+    </linearGradient>
+
+    <!-- Global mist from bottom -->
+    <linearGradient id="bottomMist" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="rgba(180,215,240,0)"/>
+      <stop offset="60%"  stop-color="rgba(180,215,240,0.08)"/>
+      <stop offset="100%" stop-color="rgba(150,190,220,0.22)"/>
+    </linearGradient>
+
+    <!-- Vignette edges -->
+    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
+      <stop offset="0%"   stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,8,0.55)"/>
+    </radialGradient>
+
+    <!-- Blur filters -->
+    <filter id="b2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="b4"><feGaussianBlur stdDeviation="4"/></filter>
+    <filter id="b8"><feGaussianBlur stdDeviation="8"/></filter>
+    <filter id="b14"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="b20"><feGaussianBlur stdDeviation="20"/></filter>
+
+    <!-- Cloud softness -->
+    <filter id="cloudBlur">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+
+  <!-- ── Base sky ── -->
+  <rect width="1440" height="900" fill="url(#sky)"/>
+
+  <!-- ── Upper-sky star glow ── -->
+  <rect width="1440" height="900" fill="url(#starglow)"/>
+
+  <!-- ── Star dots ── -->
+  <g fill="white" opacity="0.55">
+    <circle cx="120"  cy="45"  r="0.8"/>
+    <circle cx="290"  cy="28"  r="0.9"/>
+    <circle cx="430"  cy="60"  r="0.7"/>
+    <circle cx="580"  cy="18"  r="1.0"/>
+    <circle cx="700"  cy="50"  r="0.6"/>
+    <circle cx="820"  cy="30"  r="0.9"/>
+    <circle cx="950"  cy="55"  r="0.7"/>
+    <circle cx="1080" cy="22"  r="1.0"/>
+    <circle cx="1220" cy="48"  r="0.8"/>
+    <circle cx="1360" cy="32"  r="0.9"/>
+    <circle cx="200"  cy="90"  r="0.6"/>
+    <circle cx="460"  cy="105" r="0.7"/>
+    <circle cx="640"  cy="82"  r="0.8"/>
+    <circle cx="900"  cy="95"  r="0.6"/>
+    <circle cx="1150" cy="78"  r="0.8"/>
+    <circle cx="1300" cy="100" r="0.7"/>
+  </g>
+
+  <!-- ── Soft clouds near horizon ── -->
+  <g opacity="0.28" filter="url(#cloudBlur)">
+    <ellipse cx="250"  cy="420" rx="200" ry="40"  fill="#c8dff0"/>
+    <ellipse cx="680"  cy="400" rx="280" ry="50"  fill="#b8d4ec"/>
+    <ellipse cx="1100" cy="415" rx="240" ry="45"  fill="#c0d8f0"/>
+    <ellipse cx="1350" cy="430" rx="160" ry="35"  fill="#c8dff0"/>
+    <ellipse cx="50"   cy="440" rx="120" ry="30"  fill="#b8d4ec"/>
+  </g>
+
+  <!-- ── Horizon atmospheric glow ── -->
+  <rect width="1440" height="900" fill="url(#horiGlow)"/>
+
+  <!-- ── Far distant mountain range (blurred, blue/slate) ── -->
+  <g filter="url(#b4)" opacity="0.75">
+    <path d="
+      M   0,540
+      L  60,490  L 100,510  L 140,468  L 190,488
+      L 240,445  L 295,465  L 350,418  L 410,445
+      L 470,400  L 535,428  L 595,382  L 655,410
+      L 715,362  L 775,392  L 835,345  L 895,375
+      L 955,330  L 1015,358 L 1075,312 L 1135,345
+      L 1195,298 L 1255,332 L 1315,285 L 1375,318
+      L 1440,278 L 1440,900 L 0,900 Z"
+      fill="url(#farMtnFill)"/>
+  </g>
+
+  <!-- ── Snow caps on far peaks ── -->
+  <g opacity="0.60" filter="url(#b2)">
+    <!-- peak near x=470 -->
+    <path d="M470,400 L490,376 L512,400 Z" fill="url(#snow)"/>
+    <!-- peak near x=715 -->
+    <path d="M715,362 L738,335 L762,362 Z" fill="url(#snow)"/>
+    <!-- peak near x=955 -->
+    <path d="M955,330 L978,302 L1002,330 Z" fill="url(#snow)"/>
+    <!-- peak near x=1195 -->
+    <path d="M1195,298 L1218,268 L1244,298 Z" fill="url(#snow)"/>
+    <!-- peak near x=1315 -->
+    <path d="M1315,285 L1335,260 L1358,285 Z" fill="url(#snow)"/>
+    <!-- additional left peaks -->
+    <path d="M350,418 L366,398 L384,418 Z" fill="url(#snow)"/>
+    <path d="M595,382 L611,360 L629,382 Z" fill="url(#snow)"/>
+    <path d="M835,345 L852,320 L872,345 Z" fill="url(#snow)"/>
+    <path d="M1075,312 L1092,287 L1112,312 Z" fill="url(#snow)"/>
+  </g>
+
+  <!-- ── Mist band between far and mid mountains ── -->
+  <g filter="url(#b14)">
+    <rect x="0" y="480" width="1440" height="120" fill="rgba(185,215,240,0.14)"/>
+    <rect x="0" y="520" width="1440" height="80"  fill="rgba(200,225,248,0.10)"/>
+  </g>
+
+  <!-- ── Mid-range mountains — left (darker) ── -->
+  <path d="
+    M   0,640
+    C  70,590  130,620  200,570
+    C 270,520  340,600  420,550
+    C 490,505  560,580  640,535
+    C 700,500  760,560  820,530
+    L 820,900 L 0,900 Z"
+    fill="url(#midMtn)" opacity="0.90"/>
+
+  <!-- ── Mid-range mountains — right (lit face, slightly brighter) ── -->
+  <path d="
+    M 820,530
+    C 890,495  960,560  1040,515
+    C 1110,475 1180,545 1260,500
+    C 1330,462 1390,520  1440,488
+    L 1440,900 L 820,900 Z"
+    fill="url(#midMtnLight)" opacity="0.88"/>
+
+  <!-- ── Atmospheric mist layer over mid mountains ── -->
+  <g filter="url(#b8)">
+    <rect x="0" y="560" width="1440" height="100" fill="rgba(175,210,238,0.10)"/>
+  </g>
+
+  <!-- ── Lake / water body (centre-lower) ── -->
+  <ellipse cx="720" cy="760" rx="480" ry="60" fill="url(#lake)" opacity="0.65" filter="url(#b4)"/>
+  <!-- Subtle reflection shimmer -->
+  <ellipse cx="720" cy="760" rx="350" ry="30" fill="rgba(180,220,255,0.18)" filter="url(#b8)"/>
+
+  <!-- ── Foreground rolling tea garden hills ── -->
+  <path d="
+    M   0,720
+    C  80,680  180,710  280,675
+    C 380,640  480,700  600,660
+    C 710,625  820,690  940,645
+    C 1050,608 1160,672 1290,630
+    C 1370,608 1420,638 1440,625
+    L 1440,900 L 0,900 Z"
+    fill="url(#fgHill)" opacity="0.96"/>
+
+  <!-- ── Dark foreground base ── -->
+  <path d="
+    M   0,820
+    C 200,795  400,810  600,798
+    C 800,786  1000,808 1200,794
+    C 1340,784 1410,800 1440,795
+    L 1440,900 L 0,900 Z"
+    fill="url(#ground)"/>
+
+  <!-- ── Bottom atmospheric mist ── -->
+  <rect width="1440" height="900" fill="url(#bottomMist)"/>
+
+  <!-- ── Edge vignette ── -->
+  <rect width="1440" height="900" fill="url(#vignette)"/>
+</svg>

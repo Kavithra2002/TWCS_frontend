@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Bell, Droplets, Layers, Leaf, Scale, Thermometer } from 'lucide-react';
-import { AlertList } from '@/components/alerts/AlertList';
 import { MultiSeriesChart } from '@/components/charts/MultiSeriesChart';
 import { StatusDonut } from '@/components/charts/StatusDonut';
 import { KpiCard } from '@/components/indicators/KpiCard';
@@ -48,8 +47,10 @@ export default function DashboardPage() {
         <KpiCard label="Open alerts" value={kpis.openAlerts} icon={Bell} color="#ef4444" alert={kpis.openAlerts > 0} hint={<Link href="/alerts" className="hover:text-slate-300">View all →</Link>} />
       </div>
 
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-3 xl:items-stretch">
-        <div className="space-y-4 xl:col-span-2">
+      {/* 3-column grid: left 2 cols stacked, right col alongside */}
+      <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        {/* Left column: withering troughs + climate trend stacked */}
+        <div className="flex flex-col gap-3 xl:col-span-2">
           <Card
             title="Withering troughs"
             subtitle={
@@ -67,7 +68,8 @@ export default function DashboardPage() {
           <ClimateTrend troughs={data.troughs} />
         </div>
 
-        <div className="flex flex-col gap-4 xl:min-h-0">
+        {/* Right column */}
+        <div className="flex flex-col gap-3">
           <Card title="Trough status">
             <StatusDonut
               centerValue={String(simTotal || kpis.troughs.total)}
@@ -87,9 +89,6 @@ export default function DashboardPage() {
                     ]
               }
             />
-          </Card>
-          <Card title="Open alerts" action={<Link href="/alerts" className="text-xs text-tea-400 hover:text-tea-300">All alerts</Link>}>
-            <AlertList alerts={data.recentAlerts} />
           </Card>
           <TodaySchedule />
         </div>
@@ -167,6 +166,7 @@ function ClimateTrend({ troughs }: { troughs: TroughWithLive[] }) {
         <Loading />
       ) : (
         <MultiSeriesChart
+          height={380}
           leftUnit="°C"
           rightUnit="%"
           series={[
@@ -194,8 +194,7 @@ function TodaySchedule() {
       title="Today's schedule"
       subtitle={data ? `Factory time ${data.now} (${data.timeZone})` : undefined}
       action={<Link href="/schedules" className="text-xs text-tea-400 hover:text-tea-300">Manage</Link>}
-      className="flex min-h-0 flex-1 flex-col"
-      bodyClassName="min-h-0 flex-1 overflow-y-auto"
+      bodyClassName="overflow-y-auto max-h-[464px]"
     >
       {!data ? (
         <Loading />
