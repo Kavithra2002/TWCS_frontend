@@ -114,6 +114,17 @@ html.light .running-glow {
     0 1px 0    rgba(34,197,94,0.25);
 }
 
+/* Phase alert toast — progress drain */
+@keyframes toast-progress-drain {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.toast-progress-bar {
+  animation: toast-progress-drain linear forwards;
+  will-change: width;
+}
+
 /* Recharts tweaks for the dark theme */
 .recharts-cartesian-grid line {
   stroke: var(--chart-grid);
