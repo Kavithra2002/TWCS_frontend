@@ -2,7 +2,6 @@
 
 import clsx from 'clsx';
 import {
-  Bell,
   CalendarClock,
   FileBarChart,
   Database,
@@ -27,7 +26,6 @@ const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string }[
   { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/15 text-teal-400' },
   { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/15 text-emerald-400' },
   { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/15 text-amber-400' },
-  { href: '/alerts', label: 'Alerts', icon: Bell, iconClass: 'bg-red-500/15 text-red-400' },
   { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/15 text-violet-400' },
   { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/15 text-indigo-400' },
   { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/15 text-rose-400' },
