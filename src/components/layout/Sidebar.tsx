@@ -40,45 +40,64 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
     <aside
       className={clsx(
         /* 12 px gap from every viewport edge — the sidebar floats */
-        'fixed bottom-3 left-3 top-3 z-40 flex w-60 flex-col transition-transform lg:translate-x-0',
+        'fixed bottom-3 left-3 top-3 z-40 flex w-56 flex-col transition-transform lg:translate-x-0',
         'glass rounded-2xl',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
       {/* Logo */}
-      <div className="border-b border-black/10 px-3 py-3">
-        <Image
-          src={logo}
-          alt="TWCS — Tea Withering Control System"
-          priority
-          sizes="216px"
-          className="h-auto w-full rounded-md"
-        />
+      <div className="px-2.5 pt-2.5 pb-2">
+        <div className="overflow-hidden rounded-xl bg-white/90 shadow-sm ring-1 ring-black/5">
+          <Image
+            src={logo}
+            alt="TWCS — Tea Withering Control System"
+            priority
+            sizes="200px"
+            className="h-auto w-full"
+          />
+        </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {NAV.map(({ href, label, icon: Icon, iconClass }) => (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={clsx(
-              'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-150',
-              isActive(href)
-                ? 'bg-white font-bold text-[#111827] shadow-[0_2px_8px_rgba(0,0,0,0.18)]'
-                : 'font-medium text-[#111827] hover:bg-white/20',
-            )}
-          >
-            <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', iconClass)}>
-              <Icon className="h-3.5 w-3.5" />
-            </span>
-            {label}
-          </Link>
-        ))}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 pt-1">
+        {NAV.map(({ href, label, icon: Icon, iconClass }) => {
+          const active = isActive(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              className={clsx(
+                'group relative flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] leading-none transition-colors duration-150',
+                active
+                  ? 'bg-white/95 font-semibold text-[#111827] shadow-sm ring-1 ring-black/5'
+                  : 'font-medium text-[#111827]/70 hover:bg-white/25 hover:text-[#111827]',
+              )}
+            >
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1/2 h-3.5 w-0.5 -translate-y-1/2 rounded-full bg-tea-600"
+                />
+              )}
+              <span
+                className={clsx(
+                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-transform duration-150',
+                  iconClass,
+                  !active && 'group-hover:scale-105',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+              </span>
+              <span className="truncate">{label}</span>
+            </Link>
+          );
+        })}
       </nav>
 
-      <div className="shrink-0 border-t border-black/10 px-4 py-3 text-[11px] text-[#111827]/50">TWCS v0.1.0</div>
+      <div className="shrink-0 px-3 py-2.5 text-[10px] font-medium tracking-wide text-[#111827]/40">
+        TWCS v0.1.0
+      </div>
     </aside>
   );
 }
