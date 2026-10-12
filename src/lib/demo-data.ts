@@ -115,14 +115,11 @@ function buildStore() {
   const batches: BatchRow[] = [];
   const schedules: ScheduleRow[] = [];
 
-  const activeCodes = ['B-WT-01-MULENDRW', 'B-WT-02-MULENOGI', 'B-WT-03-MUL6NOTU', 'B-WT-04-MULENOTU'];
-  const activeIntake = [1540, 1580, 1620, 1660];
-  const activeStartedHours = [3.03, 2.2, 3.05, 0.7];
-
+  // No troughs running today — sessions appear once operators start a run.
   for (let i = 1; i <= 6; i++) {
     const id = `trough-${String(i).padStart(2, '0')}`;
     const code = `WT-${String(i).padStart(2, '0')}`;
-    const status: TroughStatus = i <= 4 ? 'RUNNING' : i === 5 ? 'IDLE' : 'MAINTENANCE';
+    const status: TroughStatus = i === 6 ? 'MAINTENANCE' : 'IDLE';
     troughs.push({
       id,
       code,
@@ -162,74 +159,12 @@ function buildStore() {
         troughId: id,
         ...p,
         enabled: true,
-        lastRunAt: i <= 4 && p.action === 'WITHERING_CYCLE' ? hoursAgo(8) : null,
+        lastRunAt: i <= 4 && p.action === 'WITHERING_CYCLE' ? hoursAgo(24 + 8) : null,
       });
     });
-
-    if (i <= 4) {
-      batches.push({
-        id: `batch-active-${i}`,
-        code: activeCodes[i - 1],
-        troughId: id,
-        leafIntakeKg: activeIntake[i - 1],
-        initialMoisture: 78,
-        targetMoisture: 62,
-        finalMoisture: null,
-        status: 'WITHERING',
-        plannedStartAt: null,
-        startedAt: hoursAgo(activeStartedHours[i - 1]),
-        endedAt: null,
-        notes: null,
-        createdAt: hoursAgo(activeStartedHours[i - 1]),
-      });
-      batches.push({
-        id: `batch-done-${i}`,
-        code: `B-${code}-PREV${i}`,
-        troughId: id,
-        leafIntakeKg: 1480 + i * 20,
-        initialMoisture: 78,
-        targetMoisture: 62,
-        finalMoisture: 61.6,
-        status: 'COMPLETED',
-        plannedStartAt: null,
-        startedAt: hoursAgo(24 * 5 + 6),
-        endedAt: hoursAgo(24 * 4 + 8),
-        notes: null,
-        createdAt: hoursAgo(24 * 5 + 6),
-      });
-    }
   }
 
-  batches.push({
-    id: 'batch-planned-5',
-    code: 'B-WT-05-PLAN01',
-    troughId: 'trough-05',
-    leafIntakeKg: 1500,
-    initialMoisture: 77.5,
-    targetMoisture: 62,
-    finalMoisture: null,
-    status: 'PLANNED',
-    plannedStartAt: hoursAgo(-4),
-    startedAt: null,
-    endedAt: null,
-    notes: 'Afternoon intake from field 12',
-    createdAt: hoursAgo(2),
-  });
-  batches.push({
-    id: 'batch-aborted-2',
-    code: 'B-WT-02-ABT01',
-    troughId: 'trough-02',
-    leafIntakeKg: 1320,
-    initialMoisture: 79,
-    targetMoisture: 62,
-    finalMoisture: null,
-    status: 'ABORTED',
-    plannedStartAt: null,
-    startedAt: hoursAgo(24 * 8),
-    endedAt: hoursAgo(24 * 8 - 2),
-    notes: 'Aborted: uneven spread',
-    createdAt: hoursAgo(24 * 8),
-  });
+  // Batches start empty — sessions appear when troughs are run (for clean testing).
 
   const fan = sensors.find((s) => s.id === 'sensor-04-FAN_SPEED')!;
   const alerts: AlertRow[] = [
@@ -387,11 +322,36 @@ function overview() {
 function listBatches(params: URLSearchParams) {
   const status = params.get('status');
   const troughId = params.get('troughId');
+  const from = params.get('from') ? new Date(params.get('from')!).getTime() : null;
+  const to = params.get('to') ? new Date(params.get('to')!).getTime() : null;
   const limit = Number(params.get('limit') ?? 200);
+
+  const inWindow = (iso: string | null) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    if (from != null && t < from) return false;
+    if (to != null && t > to) return false;
+    return true;
+  };
+
   return db.batches
-    .filter((b) => (!status || b.status === status) && (!troughId || b.troughId === troughId))
+    .filter((b) => {
+      if (status && b.status !== status) return false;
+      if (troughId && b.troughId !== troughId) return false;
+      if (from == null && to == null) return true;
+      return (
+        inWindow(b.startedAt) ||
+        inWindow(b.endedAt) ||
+        inWindow(b.plannedStartAt) ||
+        (b.status === 'PLANNED' && inWindow(b.createdAt))
+      );
+    })
     .map(enrichBatch)
-    .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
+    .sort((a, b) => {
+      const at = a.startedAt ?? a.plannedStartAt ?? a.createdAt;
+      const bt = b.startedAt ?? b.plannedStartAt ?? b.createdAt;
+      return bt > at ? 1 : -1;
+    })
     .slice(0, limit);
 }
 
@@ -434,10 +394,11 @@ function hash(text: string) {
 function series(params: URLSearchParams): SeriesResponse {
   const sensor = db.sensors.find((s) => s.id === params.get('sensorId'));
   if (!sensor) throw new Error('Unknown sensor');
-  const end = Date.now();
+  const end = params.get('to') ? new Date(params.get('to')!).getTime() : Date.now();
   const start = params.get('from') ? new Date(params.get('from')!).getTime() : end - 6 * 60 * 60 * 1000;
   const count = Math.max(20, Number(params.get('points') ?? 180));
-  const bucketMs = Math.max(1000, Math.ceil((end - start) / count));
+  const span = Math.max(end - start, 60_000);
+  const bucketMs = Math.max(1000, Math.ceil(span / count));
   const amp =
     sensor.type === 'AIRFLOW' ? 900 : sensor.type === 'FAN_SPEED' ? 45 : sensor.type === 'LEAF_WEIGHT' ? 18 : sensor.type === 'HUMIDITY' ? 1.6 : 0.55;
   let seed = hash(sensor.id);

@@ -392,7 +392,11 @@ export function LiveMetricsPanel({
           unit="%"
           icon={SlidersHorizontal}
           color="#22d3ee"
-          hint={`Demand ${fmtNumber(curr.amb_louver_demand_pct, 0)}%`}
+          hint={
+            curr.amb_louver_demand_pct != null
+              ? `Demand ${fmtNumber(curr.amb_louver_demand_pct, 0)}%`
+              : undefined
+          }
         />
       </div>
 

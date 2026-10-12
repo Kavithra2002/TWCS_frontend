@@ -115,9 +115,9 @@ function TroughList({ troughs }: { troughs: SimTroughState[] }) {
 
       {/* Compact offline rows */}
       {offline.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {active.length > 0 && (
-            <p className="text-[10px] uppercase tracking-widest text-slate-600 px-1 pt-1">
+            <p className="px-1 pt-1 text-[10px] font-medium uppercase tracking-widest text-slate-400">
               Offline · {offline.length}
             </p>
           )}
