@@ -1,22 +1,41 @@
 'use client';
 
-import { LogOut, Menu, Moon, Sun } from 'lucide-react';
+import clsx from 'clsx';
+import { LogOut, Menu, Moon, RefreshCw, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { useRealtime } from '@/components/providers/RealtimeProvider';
+import { useDataStatus } from '@/components/providers/DataStatusProvider';
 import { AlertDropdown } from '@/components/layout/AlertDropdown';
 import { format } from 'date-fns';
 
+function formatAgo(seconds: number): string {
+  if (seconds < 1) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s ago` : `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m ago`;
+}
+
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();
-  const { connected } = useRealtime();
+  const { lastUpdatedAt, refreshing, refresh } = useDataStatus();
   const [now, setNow] = useState<Date | null>(null);
+  const [agoSec, setAgoSec] = useState(0);
 
   useEffect(() => {
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    const tick = () => setAgoSec(Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [lastUpdatedAt]);
 
   return (
     <header className="sticky top-3 z-30 flex h-14 items-center justify-between gap-4 rounded-2xl px-4 lg:px-5 glass">
@@ -29,19 +48,37 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Live indicator pill */}
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs backdrop-blur-sm">
+        {/* Last updated + manual refresh */}
+        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 py-1 pl-3 pr-1 text-xs backdrop-blur-sm">
           <span
-            className={`h-2 w-2 rounded-full ${
-              connected ? 'animate-pulse bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-red-500'
-            }`}
+            className={clsx(
+              'h-1.5 w-1.5 shrink-0 rounded-full',
+              refreshing
+                ? 'animate-pulse bg-sky-400'
+                : agoSec <= 5
+                  ? 'bg-emerald-400'
+                  : agoSec <= 60
+                    ? 'bg-amber-400'
+                    : 'bg-slate-400',
+            )}
           />
-          <span className="font-medium text-slate-300">{connected ? 'Live' : 'Disconnected'}</span>
+          <span className="font-medium tabular-nums text-slate-300">
+            {refreshing ? 'Updating…' : `Updated ${formatAgo(agoSec)}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={refreshing}
+            className="ml-0.5 rounded-full p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-slate-100 disabled:opacity-50"
+            aria-label="Refresh data"
+            title="Refresh data"
+          >
+            <RefreshCw className={clsx('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+          </button>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Clock */}
         {now && (
           <div className="hidden text-right sm:block">
             <p className="font-mono text-sm tabular-nums text-slate-100">{format(now, 'HH:mm:ss')}</p>
@@ -49,7 +86,6 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           </div>
         )}
 
-        {/* User info */}
         {user && (
           <div className="hidden text-right md:block">
             <p className="text-sm font-medium text-slate-100">{user.name}</p>
@@ -59,7 +95,6 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
 
         <AlertDropdown />
 
-        {/* Theme toggle */}
         <button
           onClick={() => {
             const next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
@@ -74,7 +109,6 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <Moon className="theme-icon-moon h-4 w-4" />
         </button>
 
-        {/* Logout */}
         <button
           onClick={logout}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
