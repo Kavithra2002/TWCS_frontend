@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { TroughRingCard } from '@/components/troughs/TroughRingCard';
 import { TroughDetailModal } from '@/components/troughs/TroughDetailModal';
+import { TroughComparison } from '@/components/troughs/TroughComparison';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useSimulator } from '@/contexts/SimulatorContext';
 
@@ -31,15 +32,19 @@ export default function TroughsPage() {
           Loading…
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {troughList.map((t) => (
-            <TroughRingCard
-              key={t.data.id}
-              troughState={t}
-              onView={() => setViewingId(t.data.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {troughList.map((t) => (
+              <TroughRingCard
+                key={t.data.id}
+                troughState={t}
+                onView={() => setViewingId(t.data.id)}
+              />
+            ))}
+          </div>
+
+          <TroughComparison troughs={troughList} />
+        </>
       )}
 
       {viewingTrough && (
