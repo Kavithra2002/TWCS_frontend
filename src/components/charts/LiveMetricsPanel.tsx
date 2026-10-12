@@ -415,18 +415,10 @@ export function LiveMetricsPanel({
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card title="Actuators" subtitle="Fan & louver positions vs demand">
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
-            {ACTUATOR_SENSORS.map((s) => (
-              <LiveSensorTile key={s.mkey} def={s} curr={curr} history={hist(s.mkey)} />
-            ))}
-          </div>
-        </Card>
-
-        <Card title="Pressure" subtitle="Chamber pressure & demand">
-          <div className="grid grid-cols-2 gap-3">
-            {PRESSURE_SENSORS.map((s) => (
+      <div className="mt-4">
+        <Card title="Actuators & Pressure" subtitle="Fan, louver positions vs demand · chamber pressure">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+            {[...ACTUATOR_SENSORS, ...PRESSURE_SENSORS].map((s) => (
               <LiveSensorTile key={s.mkey} def={s} curr={curr} history={hist(s.mkey)} />
             ))}
           </div>
