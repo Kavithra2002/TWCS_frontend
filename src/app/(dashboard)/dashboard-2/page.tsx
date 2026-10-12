@@ -143,14 +143,18 @@ export default function LiveMonitoringPage() {
             idx={idx}
             showControls={false}
           />
-          <WitherWeightChart
-            points={visibleChart}
-            allPoints={allChartPoints}
-            surfaceEndHour={surfaceEndHour}
-            maxHour={maxHour}
-            yDomain={yDomain}
-          />
-          <WitherRunTable points={visibleChart} surfaceEndHour={surfaceEndHour} />
+          <div className="mt-4">
+            <WitherWeightChart
+              points={visibleChart}
+              allPoints={allChartPoints}
+              surfaceEndHour={surfaceEndHour}
+              maxHour={maxHour}
+              yDomain={yDomain}
+            />
+          </div>
+          <div className="mt-4">
+            <WitherRunTable points={visibleChart} surfaceEndHour={surfaceEndHour} />
+          </div>
         </>
       ) : (
         <div className="mt-12 flex flex-col items-center gap-3 text-center">
