@@ -42,7 +42,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               )}
 
               {/* Right-side wrapper — leaves a 12 px gap on all sides so every panel floats */}
-              <div className="flex min-h-screen flex-col lg:pl-[264px]">
+              <div className="flex min-h-screen flex-col lg:pl-[248px]">
                 <div className="px-3 pt-3">
                   <Topbar onMenu={() => setMenuOpen(true)} />
                 </div>
