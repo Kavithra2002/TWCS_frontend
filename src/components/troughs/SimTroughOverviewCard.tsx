@@ -12,30 +12,40 @@ export function SimTroughOfflineRow({ troughState }: { troughState: SimTroughSta
   const paused = idx > 0;
 
   return (
-    <div className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
-      paused
-        ? 'border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10'
-        : 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10'
-    }`}>
-      {/* Status dot */}
-      <span className={`h-2 w-2 shrink-0 rounded-full ${paused ? 'bg-amber-500' : 'bg-red-500'}`} />
-
-      {/* Name */}
-      <span className={`w-20 shrink-0 text-sm font-semibold ${paused ? 'text-amber-400' : 'text-red-400'}`}>
-        Trough {session.trough_number}
-      </span>
-
-      {/* Meta */}
-      <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
-        {session.airflow_mode} · {session.starting_weight_kg.toLocaleString()} kg · target {session.target_ws_pct}% WS
-      </span>
-
-      {/* Badge */}
-      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+    <div
+      className={`flex items-center gap-3 rounded-xl border px-3.5 py-[9px] transition-colors ${
         paused
-          ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-          : 'border-red-500/30 bg-red-500/10 text-red-400'
-      }`}>
+          ? 'border-amber-500/25 bg-amber-500/[0.06] hover:bg-amber-500/10'
+          : 'border-black/[0.08] bg-black/[0.03] hover:bg-black/[0.055]'
+      }`}
+    >
+      <span
+        className={`h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-offset-1 ring-offset-transparent ${
+          paused ? 'bg-amber-500 ring-amber-500/25' : 'bg-slate-400 ring-slate-400/20'
+        }`}
+      />
+
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm font-semibold tracking-tight ${
+            paused ? 'text-amber-500' : 'text-slate-100'
+          }`}
+        >
+          Trough {session.trough_number}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-slate-400">
+          {session.airflow_mode} · {session.starting_weight_kg.toLocaleString()} kg · target{' '}
+          {session.target_ws_pct}% WS
+        </p>
+      </div>
+
+      <span
+        className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+          paused
+            ? 'border-amber-500/30 bg-amber-500/10 text-amber-500'
+            : 'border-red-500/35 bg-red-500/10 text-red-500'
+        }`}
+      >
         {paused ? 'Paused' : 'Offline'}
       </span>
     </div>

@@ -1,7 +1,8 @@
 import clsx from 'clsx';
 
 interface SegmentedProps<T extends string> {
-  value: T;
+  /** Pass `null` when none of the presets should look selected (e.g. custom calendar day). */
+  value: T | null;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
 }
@@ -12,6 +13,7 @@ export function Segmented<T extends string>({ value, options, onChange }: Segmen
       {options.map((o) => (
         <button
           key={o.value}
+          type="button"
           onClick={() => onChange(o.value)}
           className={clsx(
             'rounded-md px-2.5 py-1 text-xs font-medium transition',

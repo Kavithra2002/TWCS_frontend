@@ -12,6 +12,29 @@ import type { SimPoint, SimTroughData } from '@/lib/sim-data';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Blank point so KPI / sensor cards render with empty (—) values. */
+const EMPTY_POINT: TimeSeriesPoint = {
+  timestamp: '',
+  ambient_rh_pct: null,
+  ambient_temp_c: null,
+  inlet_rh_pct: null,
+  inlet_temp_c: null,
+  upper_rh_pct: null,
+  upper_temp_c: null,
+  lower_rh_pct: null,
+  lower_temp_c: null,
+  chamber_pressure_pa: null,
+  pressure_demand_pa: null,
+  fan_speed_hz: null,
+  hot_louver_position_pct: null,
+  hot_louver_demand_pct: null,
+  amb_louver_position_pct: null,
+  amb_louver_demand_pct: null,
+  cumulative_energy_kwh: null,
+  current_ws_pct: null,
+  weight_kg: null,
+};
+
 function toTimeSeriesPoints(timeSeries: SimPoint[]): TimeSeriesPoint[] {
   return timeSeries as unknown as TimeSeriesPoint[];
 }
@@ -136,37 +159,24 @@ export default function LiveMonitoringPage() {
         </div>
       </div>
 
-      {started ? (
-        <>
-          <LiveMetricsPanel
-            points={toTimeSeriesPoints(timeSeries)}
-            idx={idx}
-            showControls={false}
-          />
-          <div className="mt-4">
-            <WitherWeightChart
-              points={visibleChart}
-              allPoints={allChartPoints}
-              surfaceEndHour={surfaceEndHour}
-              maxHour={maxHour}
-              yDomain={yDomain}
-            />
-          </div>
-          <div className="mt-4">
-            <WitherRunTable points={visibleChart} surfaceEndHour={surfaceEndHour} />
-          </div>
-        </>
-      ) : (
-        <div className="mt-12 flex flex-col items-center gap-3 text-center">
-          <div className="rounded-full border border-slate-700 bg-slate-900 p-6">
-            <span className="text-4xl">🌿</span>
-          </div>
-          <p className="text-lg font-semibold text-slate-300">Trough 1 is not running</p>
-          <p className="text-sm text-slate-500">
-            Go to the <a href="/simulator" className="text-tea-400 hover:text-tea-300 underline">Simulator</a> and start Trough 1 to see live monitoring data here.
-          </p>
-        </div>
-      )}
+      {/* Always show the monitoring layout; values stay empty until the trough has started */}
+      <LiveMetricsPanel
+        points={started ? toTimeSeriesPoints(timeSeries) : [EMPTY_POINT]}
+        idx={started ? idx : 0}
+        showControls={false}
+      />
+      <div className="mt-4">
+        <WitherWeightChart
+          points={started ? visibleChart : []}
+          allPoints={started ? allChartPoints : []}
+          surfaceEndHour={surfaceEndHour}
+          maxHour={maxHour}
+          yDomain={started ? yDomain : [0, 1]}
+        />
+      </div>
+      <div className="mt-4">
+        <WitherRunTable points={started ? visibleChart : []} surfaceEndHour={surfaceEndHour} />
+      </div>
     </>
   );
 }

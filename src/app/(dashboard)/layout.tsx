@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { SWRConfig } from 'swr';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { DataStatusProvider } from '@/components/providers/DataStatusProvider';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { SimulatorProvider } from '@/contexts/SimulatorContext';
 import { PhaseAlertProvider } from '@/contexts/PhaseAlertContext';
-import { fetcher } from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -20,7 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!ready) return <div className="min-h-screen" suppressHydrationWarning />;
 
   return (
-    <SWRConfig value={{ fetcher, revalidateOnFocus: false }}>
+    <DataStatusProvider>
       <AuthProvider>
         <RealtimeProvider>
           <SimulatorProvider>
@@ -54,6 +53,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </SimulatorProvider>
         </RealtimeProvider>
       </AuthProvider>
-    </SWRConfig>
+    </DataStatusProvider>
   );
 }
