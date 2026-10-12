@@ -68,7 +68,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
               href={href}
               onClick={onNavigate}
               className={clsx(
-                'group relative flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] leading-none transition-colors duration-150',
+                'group relative flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] leading-snug transition-colors duration-150',
                 active
                   ? 'bg-white/95 font-semibold text-[#111827] shadow-sm ring-1 ring-black/5'
                   : 'font-medium text-[#111827]/70 hover:bg-white/25 hover:text-[#111827]',
