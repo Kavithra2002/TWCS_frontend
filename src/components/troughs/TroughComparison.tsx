@@ -122,11 +122,22 @@ function pickMetric(point: SimPoint, metric: MetricKey, startWeight: number): nu
   }
 }
 
-function downsample<T>(arr: T[], max: number): T[] {
-  if (arr.length <= max) return arr;
+/**
+ * Progressive sample like Live Monitoring:
+ * - recent points are kept 1:1 so each simulator tick extends the tip
+ * - older history uses a fixed stride from the full series (stable, no reshuffle)
+ */
+function progressiveSample<T>(progressed: T[], fullLength: number, max: number): T[] {
+  if (progressed.length === 0) return [];
+  if (progressed.length <= max) return progressed;
+
+  const stride = Math.max(1, Math.ceil(fullLength / max));
+  const recentCount = Math.min(80, progressed.length);
+  const recentStart = progressed.length - recentCount;
+
   const out: T[] = [];
-  const step = (arr.length - 1) / (max - 1);
-  for (let i = 0; i < max; i++) out.push(arr[Math.round(i * step)]);
+  for (let i = 0; i < recentStart; i += stride) out.push(progressed[i]);
+  for (let i = recentStart; i < progressed.length; i++) out.push(progressed[i]);
   return out;
 }
 
@@ -141,18 +152,25 @@ interface TroughRunSummary {
   isDone: boolean;
 }
 
+function hasProgress(t: SimTroughState): boolean {
+  return t.running || t.idx > 0;
+}
+
+function progressedSeries(t: SimTroughState): SimPoint[] {
+  if (!hasProgress(t)) return [];
+  return t.data.timeSeries.slice(0, t.idx + 1);
+}
+
 function buildSummary(t: SimTroughState, color: string): TroughRunSummary {
   const { data, idx, running } = t;
   const { session, events, timeSeries } = data;
-  const last = timeSeries[timeSeries.length - 1] ?? timeSeries[0];
-  const startMs = Date.parse(session.session_start);
-  const endMs = Date.parse(session.session_end);
-  const durationMin = Math.max(0, Math.round((endMs - startMs) / 60_000));
-  const finalWs = last?.current_ws_pct ?? 100;
-
   const currentPoint = timeSeries[idx] ?? timeSeries[0];
+  const startMs = Date.parse(session.session_start);
+  const atMs = Date.parse(currentPoint?.timestamp ?? session.session_start);
+  const durationMin = Math.max(0, Math.round((atMs - startMs) / 60_000));
+  const finalWs = currentPoint?.current_ws_pct ?? 100;
   const phase = getPhase(session, events, currentPoint?.timestamp ?? session.session_start);
-  const started = running || idx > 0;
+  const started = hasProgress(t);
 
   return {
     id: data.id,
@@ -161,7 +179,7 @@ function buildSummary(t: SimTroughState, color: string): TroughRunSummary {
     finalWs,
     deltaTarget: finalWs - session.target_ws_pct,
     durationMin,
-    energyKwh: last?.cumulative_energy_kwh ?? null,
+    energyKwh: currentPoint?.cumulative_energy_kwh ?? null,
     isDone: started && phase === 'DONE' && !running,
   };
 }
@@ -169,34 +187,33 @@ function buildSummary(t: SimTroughState, color: string): TroughRunSummary {
 function buildTrendRows(
   selected: SimTroughState[],
   metric: MetricKey,
-): Record<string, number>[] {
-  const series = selected.map((t) => {
+): { rows: Record<string, number>[]; tipHourById: Record<string, number> } {
+  const tipHourById: Record<string, number> = {};
+  const map = new Map<number, Record<string, number>>();
+
+  for (const t of selected) {
     const startMs = Date.parse(t.data.session.session_start);
     const startWeight = t.data.session.starting_weight_kg;
-    const points = downsample(t.data.timeSeries, CHART_POINTS)
-      .map((p) => {
-        const value = pickMetric(p, metric, startWeight);
-        if (value == null) return null;
-        return {
-          h: Math.max(0, (Date.parse(p.timestamp) - startMs) / 3_600_000),
-          v: value,
-        };
-      })
-      .filter((x): x is { h: number; v: number } => x != null);
-    return { id: t.data.id, points };
-  });
+    const progressed = progressedSeries(t);
+    const samples = progressiveSample(progressed, t.data.timeSeries.length, CHART_POINTS);
 
-  const bucket = 0.25;
-  const map = new Map<number, Record<string, number>>();
-  for (const s of series) {
-    for (const p of s.points) {
-      const key = Math.round(p.h / bucket) * bucket;
-      const row = map.get(key) ?? { h: key };
-      row[s.id] = p.v;
-      map.set(key, row);
+    for (let i = 0; i < samples.length; i++) {
+      const p = samples[i];
+      const value = pickMetric(p, metric, startWeight);
+      if (value == null) continue;
+      // Fine hour key so each simulator tick can advance the tip (≈ point-by-point).
+      const h = Math.round(((Date.parse(p.timestamp) - startMs) / 3_600_000) * 1000) / 1000;
+      const row = map.get(h) ?? { h };
+      row[t.data.id] = value;
+      map.set(h, row);
+      if (i === samples.length - 1) tipHourById[t.data.id] = h;
     }
   }
-  return [...map.values()].sort((a, b) => a.h - b.h);
+
+  return {
+    rows: [...map.values()].sort((a, b) => a.h - b.h),
+    tipHourById,
+  };
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -262,37 +279,64 @@ function ChartPanel({
   );
 }
 
+/** Empty grid scaffold so axes render before any session points exist. */
+function emptyAxisRows(maxHours: number): Record<string, number>[] {
+  const end = Math.max(1, Math.ceil(maxHours));
+  const rows: Record<string, number>[] = [];
+  for (let h = 0; h <= end; h += 1) rows.push({ h });
+  return rows;
+}
+
 function MetricOverlayChart({
   rows,
+  tipHourById,
   summaries,
+  legendItems,
   unit,
   height,
+  xMaxHours,
+  yDomain,
   showLegend = true,
 }: {
   rows: Record<string, number>[];
+  tipHourById: Record<string, number>;
   summaries: TroughRunSummary[];
+  /** Legend stubs (selected troughs) even when no data lines yet. */
+  legendItems: { id: string; label: string; color: string }[];
   unit: string;
   height: number;
+  xMaxHours: number;
+  yDomain: [number, number];
   showLegend?: boolean;
 }) {
+  const hasLines = summaries.length > 0 && rows.length > 0;
+  const chartRows = hasLines ? rows : emptyAxisRows(xMaxHours);
+  const xMax = Math.max(xMaxHours, 1);
+  const xStep = Math.max(1, Math.round(xMax / 7));
+  const xTicks = Array.from({ length: Math.floor(xMax) + 1 }, (_, i) => i).filter(
+    (h) => h % xStep === 0 || h === Math.floor(xMax),
+  );
+
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={rows} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+      <LineChart data={chartRows} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="h"
           type="number"
-          domain={['dataMin', 'dataMax']}
+          domain={[0, xMax]}
+          ticks={xTicks}
           tickFormatter={(v) => `${Number(v).toFixed(0)}h`}
           tickLine={false}
           axisLine={false}
-          minTickGap={36}
+          minTickGap={28}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
           width={48}
-          domain={['auto', 'auto']}
+          domain={yDomain}
+          allowDataOverflow
           label={{
             value: unit,
             angle: -90,
@@ -304,33 +348,66 @@ function MetricOverlayChart({
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(v) => `${Number(v).toFixed(1)} h elapsed`}
+          labelFormatter={(v) => `${Number(v).toFixed(2)} h elapsed`}
           formatter={(v: number, name: string) => {
-            const s = summaries.find((x) => x.id === name);
+            const s = summaries.find((x) => x.id === name) ?? legendItems.find((x) => x.id === name);
             return [fmtNumber(v, 1), s?.label ?? name];
           }}
         />
-        {showLegend && (
+        {showLegend && legendItems.length > 0 && (
           <Legend
             wrapperStyle={{ fontSize: 11 }}
+            payload={legendItems.map((item) => ({
+              value: item.id,
+              type: 'line' as const,
+              color: item.color,
+              id: item.id,
+            }))}
             formatter={(value) =>
-              summaries.find((s) => s.id === value)?.label.replace('Trough ', 'T') ?? value
+              legendItems.find((s) => s.id === value)?.label.replace('Trough ', 'T') ?? value
             }
           />
         )}
-        {summaries.map((s) => (
-          <Line
-            key={s.id}
-            type="monotone"
-            dataKey={s.id}
-            name={s.id}
-            stroke={s.color}
-            strokeWidth={2}
-            dot={false}
-            connectNulls
-            isAnimationActive={false}
-          />
-        ))}
+        {summaries.map((s) => {
+          const tipH = tipHourById[s.id];
+          return (
+            <Line
+              key={s.id}
+              type="monotone"
+              dataKey={s.id}
+              name={s.id}
+              stroke={s.color}
+              strokeWidth={2}
+              connectNulls
+              isAnimationActive={false}
+              dot={(props) => {
+                const { cx, cy, payload, value, index } = props;
+                const pointKey = `${s.id}-${payload?.h ?? index ?? 'x'}`;
+                if (
+                  value == null ||
+                  cx == null ||
+                  cy == null ||
+                  tipH == null ||
+                  payload?.h !== tipH
+                ) {
+                  return <g key={pointKey} />;
+                }
+                return (
+                  <circle
+                    key={pointKey}
+                    cx={cx}
+                    cy={cy}
+                    r={3.5}
+                    fill={s.color}
+                    stroke="rgba(255,255,255,0.9)"
+                    strokeWidth={1.5}
+                  />
+                );
+              }}
+              activeDot={{ r: 4, strokeWidth: 1.5 }}
+            />
+          );
+        })}
       </LineChart>
     </ResponsiveContainer>
   );
@@ -372,19 +449,102 @@ export function TroughComparison({ troughs }: Props) {
     [sorted, selectedIds],
   );
 
+  /** Only troughs that have started a session contribute to charts / insights. */
+  const activeSelected = useMemo(() => selected.filter(hasProgress), [selected]);
+
   const summaries = useMemo(
-    () => selected.map((t) => buildSummary(t, colorById[t.data.id])),
+    () => activeSelected.map((t) => buildSummary(t, colorById[t.data.id])),
+    [activeSelected, colorById],
+  );
+
+  const hasAnyProgress = activeSelected.length > 0;
+
+  const legendItems = useMemo(
+    () =>
+      selected.map((t) => ({
+        id: t.data.id,
+        label: troughLabel(t.data),
+        color: colorById[t.data.id],
+      })),
     [selected, colorById],
   );
 
-  // Precompute series for all 6 metrics so cards stay snappy
-  const trendByMetric = useMemo(() => {
-    const out = {} as Record<MetricKey, Record<string, number>[]>;
+  const xMaxHours = useMemo(() => {
+    const source = selected.length ? selected : sorted;
+    let maxH = 14;
+    for (const t of source) {
+      const start = Date.parse(t.data.session.session_start);
+      const end = Date.parse(t.data.session.session_end);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        maxH = Math.max(maxH, (end - start) / 3_600_000);
+      }
+    }
+    return Math.ceil(maxH);
+  }, [selected, sorted]);
+
+  /** Lock Y domains to the full session range so axes stay still while points append. */
+  const yDomainByMetric = useMemo((): Record<MetricKey, [number, number]> => {
+    const fallback: Record<MetricKey, [number, number]> = {
+      ws: [50, 100],
+      weight: [0, 2000],
+      temp: [20, 40],
+      humidity: [40, 90],
+      fan: [0, 60],
+      energy: [0, 10],
+    };
+    const source = selected.length ? selected : sorted;
+    if (!source.length) return fallback;
+
+    const mins: Record<MetricKey, number> = {
+      ws: Infinity, weight: Infinity, temp: Infinity,
+      humidity: Infinity, fan: Infinity, energy: Infinity,
+    };
+    const maxs: Record<MetricKey, number> = {
+      ws: -Infinity, weight: -Infinity, temp: -Infinity,
+      humidity: -Infinity, fan: -Infinity, energy: -Infinity,
+    };
+
+    for (const t of source) {
+      const startWeight = t.data.session.starting_weight_kg;
+      // Sample the full series sparsely — domain must not depend on live idx.
+      const full = progressiveSample(t.data.timeSeries, t.data.timeSeries.length, CHART_POINTS);
+      for (const p of full) {
+        for (const m of METRIC_OPTIONS) {
+          const v = pickMetric(p, m.value, startWeight);
+          if (v == null || !Number.isFinite(v)) continue;
+          mins[m.value] = Math.min(mins[m.value], v);
+          maxs[m.value] = Math.max(maxs[m.value], v);
+        }
+      }
+    }
+
+    const out = { ...fallback };
     for (const m of METRIC_OPTIONS) {
-      out[m.value] = buildTrendRows(selected, m.value);
+      if (!Number.isFinite(mins[m.value]) || !Number.isFinite(maxs[m.value])) continue;
+      const pad = Math.max((maxs[m.value] - mins[m.value]) * 0.06, m.value === 'ws' ? 1 : 0.5);
+      out[m.value] = [
+        Math.floor((mins[m.value] - pad) * 10) / 10,
+        Math.ceil((maxs[m.value] + pad) * 10) / 10,
+      ];
     }
     return out;
-  }, [selected]);
+  }, [selected, sorted]);
+
+  // Rebuild when any selected trough's idx advances (point-by-point live draw).
+  const progressKey = activeSelected.map((t) => `${t.data.id}:${t.idx}`).join('|');
+
+  const trendByMetric = useMemo(() => {
+    const out = {} as Record<
+      MetricKey,
+      { rows: Record<string, number>[]; tipHourById: Record<string, number> }
+    >;
+    for (const m of METRIC_OPTIONS) {
+      out[m.value] = buildTrendRows(activeSelected, m.value);
+    }
+    return out;
+    // progressKey tracks idx ticks; activeSelected alone can miss updates if refs are reused
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSelected, progressKey]);
 
   const insights = useMemo(() => {
     if (!summaries.length) return null;
@@ -409,7 +569,7 @@ export function TroughComparison({ troughs }: Props) {
   const maxMeta = maxMetric ? METRIC_OPTIONS.find((m) => m.value === maxMetric) : null;
 
   return (
-    <section className="mt-8 space-y-3">
+    <section className="mt-5 space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold tracking-tight text-[#111827]">
@@ -473,7 +633,7 @@ export function TroughComparison({ troughs }: Props) {
           </div>
         </div>
 
-        {insights && summaries.length > 0 && (
+        {insights && hasAnyProgress && (
           <div className="grid grid-cols-2 divide-x divide-y divide-black/[0.06] xl:grid-cols-4 xl:divide-y-0">
             <InsightStat
               icon={Trophy}
@@ -511,7 +671,7 @@ export function TroughComparison({ troughs }: Props) {
         )}
       </div>
 
-      {!summaries.length ? (
+      {!selected.length ? (
         <Card>
           <p className="py-8 text-center text-sm text-[#111827]/55">
             Select at least one trough to compare.
@@ -523,14 +683,22 @@ export function TroughComparison({ troughs }: Props) {
             <ChartPanel
               key={m.value}
               title={m.label}
-              subtitle={m.subtitle}
+              subtitle={
+                hasAnyProgress
+                  ? m.subtitle
+                  : `${m.subtitle} · waiting for session data`
+              }
               onMaximize={() => setMaxMetric(m.value)}
             >
               <MetricOverlayChart
-                rows={trendByMetric[m.value]}
+                rows={trendByMetric[m.value].rows}
+                tipHourById={trendByMetric[m.value].tipHourById}
                 summaries={summaries}
+                legendItems={legendItems}
                 unit={m.unit}
                 height={CARD_CHART_H}
+                xMaxHours={xMaxHours}
+                yDomain={yDomainByMetric[m.value]}
               />
             </ChartPanel>
           ))}
@@ -546,10 +714,14 @@ export function TroughComparison({ troughs }: Props) {
       >
         {maxMetric && maxMeta && (
           <MetricOverlayChart
-            rows={trendByMetric[maxMetric]}
+            rows={trendByMetric[maxMetric].rows}
+            tipHourById={trendByMetric[maxMetric].tipHourById}
             summaries={summaries}
+            legendItems={legendItems}
             unit={maxMeta.unit}
             height={MAX_CHART_H}
+            xMaxHours={xMaxHours}
+            yDomain={yDomainByMetric[maxMetric]}
           />
         )}
       </Modal>
