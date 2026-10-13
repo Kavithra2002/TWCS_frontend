@@ -1,9 +1,11 @@
 'use client';
 
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { Eye } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
+import { BatchFormModal } from '@/components/batches/BatchFormModal';
 import { BatchSessionModal } from '@/components/batches/BatchSessionModal';
 import { BatchStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +29,11 @@ import type { Batch, BatchStatus, Trough } from '@/types';
 
 type Period = 'today' | '7d' | '30d' | 'custom';
 type StatusFilter = 'ALL' | 'WITHERING' | 'COMPLETED' | 'ABORTED';
+
+/** Visible body rows before the trough run log scrolls. */
+const LOG_VISIBLE_ROWS = 15;
+/** thead ~2.5rem + each tbody row ~2.75rem (py-2.5 + line). */
+const LOG_SCROLL_MAX_H = `calc(2.5rem + ${LOG_VISIBLE_ROWS} * 2.75rem)`;
 
 function periodRange(
   period: Period,
@@ -141,6 +148,7 @@ export default function BatchesPage() {
   const [customRange, setCustomRange] = useState<DayRange>(() => singleDayRange());
   const [status, setStatus] = useState<StatusFilter>('ALL');
   const [viewing, setViewing] = useState<Batch | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const range = useMemo(() => periodRange(period, customRange), [period, customRange]);
   const key = `/batches${qs({
@@ -266,7 +274,17 @@ export default function BatchesPage() {
         </div>
       </div>
 
-      <Card className="mt-4" bodyClassName="p-0" title="Trough run log" subtitle={`${range.label} · past & ongoing`}>
+      <Card
+        className="mt-4"
+        bodyClassName="p-0"
+        title="Trough run log"
+        subtitle={`${range.label} · past & ongoing · ${runs.length} run${runs.length === 1 ? '' : 's'}`}
+        action={
+          <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
+            <Plus className="h-3.5 w-3.5" /> Log run
+          </Button>
+        }
+      >
         {error ? (
           <div className="p-4">
             <ErrorState error={error} />
@@ -276,12 +294,19 @@ export default function BatchesPage() {
         ) : runs.length === 0 ? (
           <EmptyState
             title={`No trough records for ${range.label}`}
-            hint="Apply calendar days with sessions, or run a trough — finished runs show under Completed"
+            hint="Log a trough run, apply calendar days with sessions, or start a trough — finished runs show under Completed"
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            className={clsx('overflow-x-auto', runs.length > LOG_VISIBLE_ROWS && 'overflow-y-auto')}
+            style={runs.length > LOG_VISIBLE_ROWS ? { maxHeight: LOG_SCROLL_MAX_H } : undefined}
+          >
             <table className="table-base">
-              <thead>
+              <thead
+                className={clsx(
+                  runs.length > LOG_VISIBLE_ROWS && 'sticky top-0 z-10 bg-white/95 backdrop-blur-sm',
+                )}
+              >
                 <tr>
                   <th>Batch</th>
                   <th>Trough</th>
@@ -349,6 +374,13 @@ export default function BatchesPage() {
           </div>
         )}
       </Card>
+
+      <BatchFormModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onSaved={() => mutate()}
+        troughs={troughs ?? []}
+      />
 
       <BatchSessionModal
         batch={viewingBatch}
