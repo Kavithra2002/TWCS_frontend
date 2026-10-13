@@ -4,8 +4,7 @@ import clsx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Download, FileDown, Loader2 } from 'lucide-react';
-import { MultiSeriesChart } from '@/components/charts/MultiSeriesChart';
-import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { SessionHoursChart, type HourSeries } from '@/components/charts/SessionHoursChart';
 import { buildReportRows, ReportDataTable } from '@/components/reports/ReportDataTable';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -108,20 +107,41 @@ function clipSeriesToHours(points: SeriesPoint[], viewHours: number): SeriesPoin
   return points.filter((p) => Date.parse(p.t) - start <= maxMs);
 }
 
+/** Y domain from full moc/session series so empty axes match trough comparison. */
+function yDomainForSensor(sensorType: SensorType, sims: SimBind[]): [number, number] {
+  const fallback = SENSOR_META[sensorType].range;
+  if (!sims.length) return fallback;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const { sim } of sims) {
+    const series = sim.data.timeSeries;
+    const step = Math.max(1, Math.floor(series.length / 200));
+    for (let i = 0; i < series.length; i += step) {
+      const v = simMetric(series[i], sensorType);
+      if (v == null || !Number.isFinite(v)) continue;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return fallback;
+  const pad = Math.max((max - min) * 0.06, 0.5);
+  return [Math.floor((min - pad) * 10) / 10, Math.ceil((max + pad) * 10) / 10];
+}
+
 const RUN_STATUSES = new Set(['WITHERING', 'COMPLETED', 'ABORTED']);
+/** Primary report metric — no sensor dropdown; companions show the rest. */
+const REPORT_TYPE: SensorType = 'LEAF_MOISTURE';
 
 export default function ReportsPage() {
   const { data: troughs } = useSWR<TroughWithLive[]>('/troughs');
   const { state: simState } = useSimulator();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
-  const [type, setType] = useState<SensorType>('LEAF_MOISTURE');
+  const type = REPORT_TYPE;
   const [reportRange, setReportRange] = useState<DayRange>(() => singleDayRange());
-  const [viewHours, setViewHours] = useState(1);
   const [exporting, setExporting] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
   const companionRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const hourScrollerRef = useRef<HTMLDivElement>(null);
 
   const isToday = reportRange.days.some((d) => isSameCalendarDay(d, new Date()));
   const dayRange = useMemo(() => rangeBounds(reportRange), [reportRange]);
@@ -191,22 +211,14 @@ export default function ReportsPage() {
 
   const troughsHaveRun = isToday ? activeSimRuns.length > 0 : pastRunTroughIds.size > 0;
 
-  const maxSessionH = useMemo(() => {
+  /** Full session length — charts always show the complete run (no hour picker). */
+  const viewHours = useMemo(() => {
     if (isToday) {
-      if (!selectedSims.length) return 1;
-      return Math.max(...selectedSims.map((s) => s.sessionEndH), 1);
+      if (!selectedSims.length) return 14;
+      return Math.max(...selectedSims.map((s) => s.sessionEndH), 14);
     }
     return 24;
   }, [isToday, selectedSims]);
-
-  useEffect(() => {
-    setViewHours((h) => Math.min(Math.max(1, h), maxSessionH));
-  }, [maxSessionH]);
-
-  const hourOptions = useMemo(
-    () => Array.from({ length: maxSessionH }, (_, i) => i + 1),
-    [maxSessionH],
-  );
 
   const pastSensorKey = pastTargets.map((t) => t.sensor.id).join(',');
   const { data: pastSeriesRaw, isLoading: pastSeriesLoading } = useSWR(
@@ -377,7 +389,6 @@ export default function ReportsPage() {
     pastCompanions,
   ]);
 
-  const primary = seriesList[0];
   const primaryTarget = targets.find((t) => t.trough.id === activeSimRuns[0]?.trough.id) ?? targets[0];
 
   const summary = useMemo(() => {
@@ -413,6 +424,44 @@ export default function ReportsPage() {
   }, [seriesList, targets]);
 
   const periodAvg = summary?.avg ?? null;
+
+  const mainYDomain = useMemo(
+    () => yDomainForSensor(type, selectedSims),
+    [type, selectedSims],
+  );
+
+  const sessionStartMs = useMemo(() => {
+    if (!isToday || !selectedSims.length) return null;
+    const starts = selectedSims
+      .map((s) => Date.parse(s.sim.data.session.session_start))
+      .filter(Number.isFinite);
+    return starts.length ? Math.min(...starts) : null;
+  }, [isToday, selectedSims]);
+
+  /** Always pass selected troughs so axes/legend render before a run starts. */
+  const mainHourSeries = useMemo((): HourSeries[] => {
+    if (seriesList.length) {
+      return seriesList.map((c, i) => {
+        const trough = targets.find((t) => t.sensor.id === c.sensor.id)?.trough;
+        const colorIdx = troughs?.findIndex((t) => t.id === trough?.id) ?? i;
+        return {
+          key: trough?.code ?? String(i),
+          name: trough?.code ?? String(i),
+          color: COMPARE_COLORS[colorIdx % COMPARE_COLORS.length],
+          points: c.points,
+        };
+      });
+    }
+    return targets.map((t) => {
+      const colorIdx = troughs?.findIndex((x) => x.id === t.trough.id) ?? 0;
+      return {
+        key: t.trough.code,
+        name: t.trough.code,
+        color: COMPARE_COLORS[colorIdx % COMPARE_COLORS.length],
+        points: [] as SeriesPoint[],
+      };
+    });
+  }, [seriesList, targets, troughs]);
 
   const toggleTrough = (id: string) => {
     setSelectedIds((prev) => {
@@ -471,11 +520,11 @@ export default function ReportsPage() {
 
       await exportReportPdf({
         title,
-        subtitle: `${meta.label} · first ${viewHours}h of session · ${isCompare ? 'Multi-trough comparison' : troughLabel}`,
+        subtitle: `${meta.label} · full session · ${isCompare ? 'Multi-trough comparison' : troughLabel}`,
         meta: [
           `Troughs: ${troughLabel || '—'}`,
           `Generated: ${fmtDateTime(new Date())}`,
-          `View window: 0–${viewHours} h · Samples: ${summary ? summary.samples.toLocaleString() : '—'}`,
+          `Session: ${viewHours} h · Samples: ${summary ? summary.samples.toLocaleString() : '—'}`,
           selectedSims.map((s) => `${s.trough.code} session ends ${s.sessionEndH}h`).join(' · '),
         ],
         stats: [
@@ -483,7 +532,6 @@ export default function ReportsPage() {
           { label: 'Average', value: `${fmtNumber(summary?.avg, meta.decimals)} ${meta.unit}` },
           { label: 'Maximum', value: `${fmtNumber(summary?.max, meta.decimals)} ${meta.unit}` },
           { label: 'Samples', value: summary ? summary.samples.toLocaleString() : '—' },
-          { label: 'Window', value: `${viewHours} h` },
         ],
         chartElement: chartRef.current,
         companionCharts,
@@ -523,9 +571,9 @@ export default function ReportsPage() {
     ? `Comparison · ${meta.label}`
     : `${primaryTarget?.trough.code ?? selectedTroughs[0]?.code ?? ''} · ${meta.label}`;
   const chartSubtitle = troughsHaveRun
-    ? `${dayRange.label} · session window 0–${viewHours} h · one line per selected trough that has run`
+    ? `${dayRange.label} · one line per selected trough that has run`
     : isToday
-      ? 'Charts stay empty until a selected trough is run — then pick a session hour window below'
+      ? `${meta.label} over elapsed hours · waiting for session data`
       : `No trough runs on ${dayRange.label} for the selected troughs`;
 
   const dayLoading = !isToday && (dayBatchesLoading || (troughsHaveRun && pastSeriesLoading));
@@ -535,22 +583,7 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports & analysis"
         description="Pick a day on the calendar, then review that day’s trough session charts"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <DayCalendar value={reportRange} onApply={setReportRange} />
-            <select
-              className="input w-auto py-1.5 text-xs"
-              value={type}
-              onChange={(e) => setType(e.target.value as SensorType)}
-            >
-              {SENSOR_ORDER.map((t) => (
-                <option key={t} value={t}>
-                  {SENSOR_META[t].label}
-                </option>
-              ))}
-            </select>
-          </div>
-        }
+        actions={<DayCalendar value={reportRange} onApply={setReportRange} />}
       />
 
       <div className="glass rounded-xl">
@@ -563,7 +596,6 @@ export default function ReportsPage() {
               const hasSensor = t.sensors.some((s) => s.type === type);
               const simId = troughCodeToSimId(t.code);
               const sim = simId ? simState.troughs[simId] : undefined;
-              const endH = sim ? sessionEndHours(sim) : null;
               const running = !!sim && (sim.running || sim.idx > 0);
               return (
                 <button
@@ -573,7 +605,7 @@ export default function ReportsPage() {
                   onClick={() => toggleTrough(t.id)}
                   title={
                     hasSensor
-                      ? `${t.name}${endH ? ` · session ${endH}h` : ''}${running ? ' · running' : ''}`
+                      ? `${t.name}${running ? ' · running' : ''}`
                       : `No ${meta.label} sensor`
                   }
                   className={clsx(
@@ -589,11 +621,6 @@ export default function ReportsPage() {
                     style={{ backgroundColor: on ? color : '#cbd5e1' }}
                   />
                   {t.code}
-                  {endH != null && (
-                    <span className={clsx('text-[10px]', on ? 'text-[#111827]/45' : 'text-[#111827]/30')}>
-                      {endH}h
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -631,59 +658,17 @@ export default function ReportsPage() {
             </button>
           </div>
         </div>
-
-        {/* Session hour window — scroll 1h … session end (today) or 24h (past day) */}
-        <div className="border-t border-black/[0.06] px-3 py-2.5">
-          <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-[11px] font-medium text-[#111827]/45">
-              Session view · <span className="text-[#111827]">0–{viewHours} h</span>
-              <span className="ml-2 text-[#111827]/35">· {dayRange.label}</span>
-            </p>
-            <p className="text-[10px] text-[#111827]/40">
-              {isToday
-                ? selectedSims.length
-                  ? selectedSims.map((s) => `${s.trough.code} ends ${s.sessionEndH}h`).join(' · ')
-                  : 'Select troughs to load session lengths'
-                : 'Past day · scroll hours within the selected calendar day'}
-            </p>
-          </div>
-          <div
-            ref={hourScrollerRef}
-            className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:thin]"
-          >
-            {hourOptions.map((h) => {
-              const active = viewHours === h;
-              return (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={() => setViewHours(h)}
-                  title={`View first ${h}h of session`}
-                  className={clsx(
-                    'shrink-0 rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition',
-                    active
-                      ? 'bg-[#111827] text-white'
-                      : 'bg-black/[0.04] text-[#111827]/65 hover:bg-black/[0.08] hover:text-[#111827]',
-                  )}
-                >
-                  {h}h
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Minimum" value={fmtNumber(summary?.min, meta.decimals)} unit={meta.unit} />
         <Stat label="Average" value={fmtNumber(summary?.avg, meta.decimals)} unit={meta.unit} />
         <Stat label="Maximum" value={fmtNumber(summary?.max, meta.decimals)} unit={meta.unit} />
         <Stat label="Samples" value={summary ? summary.samples.toLocaleString() : '—'} />
-        <Stat label="Window" value={`${viewHours} h`} />
       </div>
 
       <Card
-        className="mt-4"
+        className="mt-3"
         title={chartTitle}
         subtitle={chartSubtitle}
         action={
@@ -704,71 +689,61 @@ export default function ReportsPage() {
           <Loading />
         ) : (
           <div ref={chartRef} className="rounded-lg bg-white/80 p-1">
-            {!troughsHaveRun ? (
-              <EmptyState
-                title={isToday ? 'No trough run yet' : `No trough runs on ${dayRange.label}`}
-                hint={
-                  isToday
-                    ? 'Start a trough on Simulator or Troughs — this chart fills from the session'
-                    : 'Pick another day on the calendar, or run troughs today to build a live report'
-                }
-              />
-            ) : !seriesList.some((s) => s.points.length) ? (
-              <EmptyState
-                title="No samples in this hour window"
-                hint="Run longer, or pick a smaller session hour above"
-              />
-            ) : isCompare || seriesList.length > 1 ? (
-              <MultiSeriesChart
-                height={MAIN_CHART_H}
-                decimals={meta.decimals}
-                leftUnit={meta.unit}
-                series={seriesList.map((c, i) => {
-                  const trough = targets.find((t) => t.sensor.id === c.sensor.id)?.trough;
-                  const colorIdx = troughs?.findIndex((t) => t.id === trough?.id) ?? i;
-                  return {
-                    key: trough?.code ?? String(i),
-                    name: trough?.code ?? String(i),
-                    color: COMPARE_COLORS[colorIdx % COMPARE_COLORS.length],
-                    points: c.points,
-                  };
-                })}
-              />
-            ) : (
-              <TimeSeriesChart
-                points={primary!.points}
-                color={meta.color}
-                unit={meta.unit}
-                decimals={meta.decimals}
-                minThreshold={primaryTarget?.sensor.minThreshold}
-                maxThreshold={primaryTarget?.sensor.maxThreshold}
-                height={MAIN_CHART_H}
-              />
-            )}
+            <SessionHoursChart
+              series={mainHourSeries}
+              xMaxHours={viewHours}
+              yDomain={mainYDomain}
+              unit={meta.unit}
+              decimals={meta.decimals}
+              height={MAIN_CHART_H}
+              sessionStartMs={sessionStartMs}
+              showLegend={mainHourSeries.length > 1}
+            />
           </div>
         )}
       </Card>
 
       {selectedIds.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-3">
           <div className="mb-2 px-0.5">
             <h2 className="text-sm font-semibold text-[#111827]">Related sensors</h2>
             <p className="mt-0.5 text-xs text-[#111827]/55">
-              Same session window (0–{viewHours} h) · half size · included in PDF when data exists
+              Same session · half size · included in PDF when data exists
             </p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {companionTypes.map((sensorType) => {
               const m = SENSOR_META[sensorType];
               const bundle = companionByType[sensorType];
-              const hasData = !!bundle?.series.some((s) => s.points.length);
-              const multi = (bundle?.targets.length ?? 0) > 1;
+              const stubTargets =
+                bundle?.targets.length
+                  ? bundle.targets
+                  : selectedTroughs
+                      .map((t) => ({
+                        trough: t,
+                        sensor: t.sensors.find((s) => s.type === sensorType),
+                      }))
+                      .filter((x): x is SensorTarget => !!x.sensor);
+              const hourSeries: HourSeries[] = stubTargets.map((t, i) => {
+                const colorIdx = troughs?.findIndex((x) => x.id === t.trough.id) ?? i;
+                const live = bundle?.series.find((s) => s.sensor.id === t.sensor.id);
+                return {
+                  key: t.trough.code,
+                  name: t.trough.code,
+                  color: COMPARE_COLORS[colorIdx % COMPARE_COLORS.length],
+                  points: live?.points ?? [],
+                };
+              });
 
               return (
                 <Card
                   key={sensorType}
                   title={m.label}
-                  subtitle={troughsHaveRun ? `${m.unit} · 0–${viewHours} h` : `${m.unit} · waiting for run`}
+                  subtitle={
+                    troughsHaveRun
+                      ? m.unit
+                      : `${m.unit} · waiting for session data`
+                  }
                 >
                   <div
                     ref={(el) => {
@@ -776,43 +751,16 @@ export default function ReportsPage() {
                     }}
                     className="rounded-lg bg-white/80 p-1"
                   >
-                    {!troughsHaveRun ? (
-                      <EmptyState
-                        title={isToday ? 'No trough run yet' : `No runs on ${dayRange.label}`}
-                        hint={
-                          isToday
-                            ? 'Start a trough on Simulator or Troughs — related data updates here'
-                            : 'Related charts appear for days with trough sessions'
-                        }
-                      />
-                    ) : !hasData ? (
-                      <EmptyState title={`No ${m.short} samples in this window`} />
-                    ) : multi ? (
-                      <MultiSeriesChart
-                        height={HALF_CHART_H}
-                        decimals={m.decimals}
-                        leftUnit={m.unit}
-                        series={bundle!.series.map((c, i) => ({
-                          key: bundle!.targets[i]?.trough.code ?? String(i),
-                          name: bundle!.targets[i]?.trough.code ?? String(i),
-                          color: COMPARE_COLORS[
-                            (troughs?.findIndex((t) => t.id === bundle!.targets[i]?.trough.id) ?? i) %
-                              COMPARE_COLORS.length
-                          ],
-                          points: c.points,
-                        }))}
-                      />
-                    ) : (
-                      <TimeSeriesChart
-                        points={bundle!.series[0].points}
-                        color={m.color}
-                        unit={m.unit}
-                        decimals={m.decimals}
-                        minThreshold={bundle!.targets[0]?.sensor.minThreshold}
-                        maxThreshold={bundle!.targets[0]?.sensor.maxThreshold}
-                        height={HALF_CHART_H}
-                      />
-                    )}
+                    <SessionHoursChart
+                      series={hourSeries}
+                      xMaxHours={viewHours}
+                      yDomain={yDomainForSensor(sensorType, selectedSims)}
+                      unit={m.unit}
+                      decimals={m.decimals}
+                      height={HALF_CHART_H}
+                      sessionStartMs={sessionStartMs}
+                      showLegend={hourSeries.length > 1}
+                    />
                   </div>
                 </Card>
               );
@@ -822,7 +770,7 @@ export default function ReportsPage() {
       )}
 
       {isCompare && seriesList.length > 0 && (
-        <Card className="mt-4" title="Per-trough summary" subtitle={`0–${viewHours} h · ${meta.label}`}>
+        <Card className="mt-3" title="Per-trough summary" subtitle={meta.label}>
           <div className="overflow-x-auto">
             <table className="table-base">
               <thead>
