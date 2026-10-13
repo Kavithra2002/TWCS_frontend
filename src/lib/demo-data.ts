@@ -35,7 +35,7 @@ const LIVE: Record<number, Record<SensorType, number>> = {
   1: { AIR_TEMPERATURE: 28.5, LEAF_TEMPERATURE: 27.6, HUMIDITY: 71.9, LEAF_MOISTURE: 73.4, AIRFLOW: 22100, FAN_SPEED: 1253, LEAF_WEIGHT: 1410 },
   2: { AIR_TEMPERATURE: 29.3, LEAF_TEMPERATURE: 28.2, HUMIDITY: 73.5, LEAF_MOISTURE: 74.3, AIRFLOW: 20850, FAN_SPEED: 1219, LEAF_WEIGHT: 1360 },
   3: { AIR_TEMPERATURE: 28.6, LEAF_TEMPERATURE: 27.1, HUMIDITY: 67.9, LEAF_MOISTURE: 70.9, AIRFLOW: 21834, FAN_SPEED: 1247, LEAF_WEIGHT: 1153 },
-  4: { AIR_TEMPERATURE: 29.3, LEAF_TEMPERATURE: 31.1, HUMIDITY: 71.9, LEAF_MOISTURE: 76.9, AIRFLOW: 22440, FAN_SPEED: 1550, LEAF_WEIGHT: 1520 },
+  4: { AIR_TEMPERATURE: 29.3, LEAF_TEMPERATURE: 31.1, HUMIDITY: 71.9, LEAF_MOISTURE: 76.9, AIRFLOW: 22440, FAN_SPEED: 1280, LEAF_WEIGHT: 1520 },
   5: { AIR_TEMPERATURE: 26.4, LEAF_TEMPERATURE: 25.1, HUMIDITY: 78.4, LEAF_MOISTURE: 76.2, AIRFLOW: 0, FAN_SPEED: 0, LEAF_WEIGHT: 0 },
   6: { AIR_TEMPERATURE: 24.8, LEAF_TEMPERATURE: 24.2, HUMIDITY: 81.0, LEAF_MOISTURE: 75.4, AIRFLOW: 0, FAN_SPEED: 0, LEAF_WEIGHT: 0 },
 };
@@ -107,7 +107,6 @@ interface AlertRow {
 }
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
-const minutesAgo = (m: number) => new Date(Date.now() - m * 60 * 1000).toISOString();
 
 function buildStore() {
   const troughs: TroughRow[] = [];
@@ -166,20 +165,7 @@ function buildStore() {
 
   // Batches start empty — sessions appear when troughs are run (for clean testing).
 
-  const fan = sensors.find((s) => s.id === 'sensor-04-FAN_SPEED')!;
   const alerts: AlertRow[] = [
-    {
-      id: 'alert-fan-04',
-      troughId: 'trough-04',
-      sensorId: fan.id,
-      severity: 'WARNING',
-      message: `Fan speed above maximum (1550 rpm, limit 1500 rpm)`,
-      value: 1550,
-      acknowledged: false,
-      acknowledgedAt: null,
-      acknowledgedBy: null,
-      createdAt: minutesAgo(1),
-    },
     {
       id: 'alert-hum-02',
       troughId: 'trough-02',
@@ -410,7 +396,6 @@ function series(params: URLSearchParams): SeriesResponse {
     const phase = i / (count - 1);
     let center = sensor.value;
     if (sensor.type === 'LEAF_MOISTURE') center = 78 - (78 - sensor.value) * phase;
-    else if (sensor.type === 'FAN_SPEED' && sensor.value > 1500) center = sensor.value - (1 - phase) * 180;
     else center = sensor.value + Math.sin(phase * Math.PI * 7 + next()) * amp;
     const avg = round(center + (next() - 0.5) * amp * 0.6, sensor.decimals);
     const spread = amp * (0.25 + next() * 0.2);

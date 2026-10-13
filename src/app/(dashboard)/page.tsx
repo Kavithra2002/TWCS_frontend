@@ -1,22 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 import useSWR from 'swr';
 import { Bell, Droplets, Layers, Leaf, Scale, Thermometer } from 'lucide-react';
-import { MultiSeriesChart } from '@/components/charts/MultiSeriesChart';
+import { SriLankaWeatherMap } from '@/components/climate/SriLankaWeatherMap';
 import { StatusDonut } from '@/components/charts/StatusDonut';
 import { KpiCard } from '@/components/indicators/KpiCard';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { SimTroughOfflineRow, SimTroughRunningCard } from '@/components/troughs/SimTroughOverviewCard';
 import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
-import { TIME_RANGE_OPTIONS, useSeries, type TimeRange } from '@/hooks/useSeries';
 import { fmtNumber } from '@/lib/format';
 import { SCHEDULE_ACTION_STYLE, SENSOR_META, TROUGH_STATUS_STYLE } from '@/lib/sensors';
-import type { DashboardOverview, TodaySchedules, TroughWithLive } from '@/types';
+import type { DashboardOverview, TodaySchedules } from '@/types';
 
 export default function DashboardPage() {
   const { data, error } = useSWR<DashboardOverview>('/dashboard/overview', { refreshInterval: 30_000 });
@@ -49,7 +46,7 @@ export default function DashboardPage() {
 
       {/* 3-column grid: left 2 cols stacked, right col alongside */}
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        {/* Left column: withering troughs + climate trend stacked */}
+        {/* Left column: withering troughs + Sri Lanka live weather map */}
         <div className="flex flex-col gap-3 xl:col-span-2">
           <Card
             title="Withering troughs"
@@ -65,7 +62,7 @@ export default function DashboardPage() {
               <TroughList troughs={simTroughs} />
             )}
           </Card>
-          <ClimateTrend troughs={data.troughs} />
+          <SriLankaWeatherMap />
         </div>
 
         {/* Right column */}
@@ -132,51 +129,6 @@ function TroughList({ troughs }: { troughs: SimTroughState[] }) {
         <p className="py-6 text-center text-sm text-slate-600">No trough data available</p>
       )}
     </div>
-  );
-}
-
-function ClimateTrend({ troughs }: { troughs: TroughWithLive[] }) {
-  const [troughId, setTroughId] = useState(troughs.find((t) => t.status === 'RUNNING')?.id ?? troughs[0]?.id);
-  const [range, setRange] = useState<TimeRange>('6h');
-  const trough = troughs.find((t) => t.id === troughId);
-  const sensorId = (type: string) => trough?.sensors.find((s) => s.type === type)?.id;
-
-  const temp = useSeries(sensorId('AIR_TEMPERATURE'), range);
-  const humidity = useSeries(sensorId('HUMIDITY'), range);
-  const moisture = useSeries(sensorId('LEAF_MOISTURE'), range);
-
-  return (
-    <Card
-      title="Climate trend"
-      subtitle="Air temperature (left axis) vs humidity & leaf moisture (right axis)"
-      action={
-        <div className="flex flex-wrap items-center gap-2">
-          <select className="input w-auto py-1 text-xs" value={troughId} onChange={(e) => setTroughId(e.target.value)}>
-            {troughs.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.code}
-              </option>
-            ))}
-          </select>
-          <Segmented value={range} options={TIME_RANGE_OPTIONS.slice(0, 4)} onChange={setRange} />
-        </div>
-      }
-    >
-      {!temp.data && temp.isLoading ? (
-        <Loading />
-      ) : (
-        <MultiSeriesChart
-          height={380}
-          leftUnit="°C"
-          rightUnit="%"
-          series={[
-            { key: 'temp', name: 'Air temp (°C)', color: SENSOR_META.AIR_TEMPERATURE.color, points: temp.data?.points ?? [] },
-            { key: 'hum', name: 'Humidity (%RH)', color: SENSOR_META.HUMIDITY.color, points: humidity.data?.points ?? [], right: true },
-            { key: 'moist', name: 'Leaf moisture (%)', color: SENSOR_META.LEAF_MOISTURE.color, points: moisture.data?.points ?? [], right: true },
-          ]}
-        />
-      )}
-    </Card>
   );
 }
 
