@@ -195,3 +195,23 @@ html.light .running-glow {
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 .recharts-text { fill: #a1a1aa; font-size: 11px; }
 html.light .recharts-text { fill: #52525b; }
+
+/* ─── Sri Lanka map place labels ─────────────────────────────────── */
+.sl-map-label {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22) !important;
+  color: #0f172a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 7px !important;
+  white-space: nowrap;
+}
+.sl-map-label::before {
+  display: none !important;
+}
+.sl-map-label-active {
+  background: #0d9488 !important;
+  color: #ffffff !important;
+}
