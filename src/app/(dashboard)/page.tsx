@@ -6,16 +6,48 @@ import { Bell, Droplets, Layers, Leaf, Scale, Thermometer } from 'lucide-react';
 import { SriLankaMap } from '@/components/climate/SriLankaMap';
 import { StatusDonut } from '@/components/charts/StatusDonut';
 import { KpiCard } from '@/components/indicators/KpiCard';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { SimTroughOfflineRow, SimTroughRunningCard } from '@/components/troughs/SimTroughOverviewCard';
 import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
+import { isOverviewOnlyRole, overviewTitleForRole, roleLabel } from '@/lib/auth';
 import { fmtNumber } from '@/lib/format';
 import { SCHEDULE_ACTION_STYLE, SENSOR_META, TROUGH_STATUS_STYLE } from '@/lib/sensors';
 import type { DashboardOverview, TodaySchedules } from '@/types';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+
+  if (isOverviewOnlyRole(user)) {
+    return <RoleOverviewView role={user!.role} />;
+  }
+
+  return <SuperAdminOverview />;
+}
+
+/** Placeholder landing page for Executive / Operation / Engineering. */
+function RoleOverviewView({ role }: { role: string }) {
+  return (
+    <>
+      <PageHeader
+        title={overviewTitleForRole(role)}
+        description={`${roleLabel(role)} workspace — more tools will appear here soon.`}
+      />
+      <Card>
+        <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
+          <p className="text-2xl font-semibold tracking-tight text-[#111827]">{overviewTitleForRole(role)}</p>
+          <p className="mt-2 max-w-md text-sm text-[#111827]/65">
+            You are signed in as {roleLabel(role)}. Only Overview is available for this role right now.
+          </p>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function SuperAdminOverview() {
   const { data, error } = useSWR<DashboardOverview>('/dashboard/overview', { refreshInterval: 30_000 });
   const { state: simState } = useSimulator();
 
@@ -33,7 +65,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Overview" description="Live withering conditions across all troughs" />
+      <PageHeader title="Overview" description="Live withering conditions across all troughs · Super admin" />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Running troughs" value={`${simRunning}/${simTotal}`} icon={Layers} hint={`${simPaused} paused · ${simReady} ready`} />

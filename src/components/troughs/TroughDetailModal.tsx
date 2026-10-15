@@ -6,7 +6,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts';
-import { getPhase, type SimTroughState, type TroughPhase } from '@/contexts/SimulatorContext';
+import { getPhase, type SimTroughState } from '@/contexts/SimulatorContext';
+import type { SimEvent } from '@/lib/sim-data';
 import { fmtNumber } from '@/lib/format';
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
@@ -23,15 +24,63 @@ function useIsDark() {
   return dark;
 }
 
-// ── Phase timeline ─────────────────────────────────────────────────────────────
-const PHASE_STEPS: { phase: TroughPhase; label: string }[] = [
-  { phase: 'SMR',  label: 'SMR'  },
-  { phase: 'IMR1', label: 'IMR1' },
-  { phase: 'LTO',  label: 'LTO'  },
-  { phase: 'IMR2', label: 'IMR2' },
-  { phase: 'DONE', label: 'Done' },
-];
-const PHASE_IDX: Record<TroughPhase, number> = { SMR: 0, IMR1: 1, LTO: 2, IMR2: 3, DONE: 4 };
+// ── Event-driven stage timeline ────────────────────────────────────────────────
+/** Compact labels for known withering action types; fallback shortens unknown ones. */
+const EVENT_STAGE_LABELS: Record<string, string> = {
+  'Start Session/LoadingStart': 'Load',
+  LoadingDone: 'Loaded',
+  StartProcess: 'Start',
+  SMRStart: 'SMR',
+  'SMRDone/IMR1Start': 'IMR1',
+  TurnoverAlert: 'Alert',
+  TurnoverStart: 'LTO',
+  'TurnoverEnd/IMR2Start': 'IMR2',
+  'IMR2End/WitheringCompletion': 'Done',
+  'UserFeedback/UnloadingStart': 'Unload',
+  'UnloadingEnd/SessionEnd': 'End',
+};
+
+function shortEventLabel(eventType: string): string {
+  if (EVENT_STAGE_LABELS[eventType]) return EVENT_STAGE_LABELS[eventType];
+  const primary = eventType.includes('/') ? eventType.split('/').pop()! : eventType;
+  return primary
+    .replace(/Start$/i, '')
+    .replace(/End$/i, '')
+    .replace(/Done$/i, '')
+    .replace(/^Start\s*/i, '')
+    .trim() || primary;
+}
+
+interface EventStage {
+  id: string;
+  label: string;
+  eventType: string;
+  timestamp: string;
+}
+
+/** One stage point per action event, in chronological order. */
+function buildEventStages(events: SimEvent[]): EventStage[] {
+  return [...events]
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+    .map((e) => ({
+      id: e.event_id,
+      label: shortEventLabel(e.event_type),
+      eventType: e.event_type,
+      timestamp: e.timestamp,
+    }));
+}
+
+/** Index of the latest stage whose timestamp is at or before `currentTs`, or -1 if none yet. */
+function getEventStageIdx(stages: EventStage[], currentTs: string, started: boolean): number {
+  if (!started || stages.length === 0) return -1;
+  const t = Date.parse(currentTs);
+  let idx = -1;
+  for (let i = 0; i < stages.length; i++) {
+    if (Date.parse(stages[i].timestamp) <= t) idx = i;
+    else break;
+  }
+  return idx;
+}
 
 // ── Chart tooltip ──────────────────────────────────────────────────────────────
 function ChartTip({ active, payload }: { active?: boolean; payload?: { payload: { h: number; ws: number; weight: number } }[] }) {
@@ -109,7 +158,9 @@ export function TroughDetailModal({
   const remainH = Math.max(0, totalH - elapsedH);
 
   const phase    = started ? getPhase(session, events, point?.timestamp ?? session.session_start) : null;
-  const phaseIdx = phase ? PHASE_IDX[phase] : -1;
+  const stages   = buildEventStages(events);
+  const stageIdx = getEventStageIdx(stages, point?.timestamp ?? session.session_start, started);
+  const activeStageLabel = stageIdx >= 0 ? stages[stageIdx].label : null;
 
   const witherPct = started
     ? Math.min(100, Math.round(((100 - ws) / (100 - session.target_ws_pct)) * 100))
@@ -169,10 +220,12 @@ export function TroughDetailModal({
             <p className="text-xs mt-0.5" style={{ color: sub }}>{session.withering_id}</p>
           </div>
           <div className="flex items-center gap-2">
-            {phase && phase !== 'DONE' && (
+            {activeStageLabel && phase !== 'DONE' && (
               <span className="rounded-md px-2 py-0.5 text-[11px] font-bold"
-                style={{ color: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.12)' }}>
-                {phase}
+                style={{ color: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.12)' }}
+                title={stages[stageIdx]?.eventType}
+              >
+                {activeStageLabel}
               </span>
             )}
             <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
@@ -191,38 +244,54 @@ export function TroughDetailModal({
 
         <div className="px-5 pb-5 pt-4 space-y-5">
 
-          {/* ── Phase timeline ── */}
-          <div className="flex items-start">
-            {PHASE_STEPS.map((s, i) => {
-              const completed = phaseIdx > i;
-              const active    = phaseIdx === i;
-              return (
-                <div key={s.phase} className="flex items-center flex-1 min-w-0">
-                  <div className="flex flex-col items-center gap-1 flex-1">
-                    <div
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold border-2 transition-all duration-300"
-                      style={{
-                        backgroundColor: completed || active ? '#22c55e' : surface,
-                        borderColor:     completed || active ? '#22c55e' : border,
-                        color:           completed || active ? '#fff' : sub,
-                        boxShadow:       active ? '0 0 0 3px rgba(34,197,94,0.20)' : 'none',
-                      }}
-                    >
-                      {completed ? '✓' : active ? '●' : i + 1}
+          {/* ── Action stage timeline (one point per session event) ── */}
+          {stages.length > 0 && (
+            <div className="overflow-x-auto -mx-1 px-1 pb-1">
+              <div className="flex items-start min-w-max w-full">
+                {stages.map((s, i) => {
+                  const completed = stageIdx > i;
+                  const active    = stageIdx === i;
+                  const compact   = stages.length > 7;
+                  return (
+                    <div key={s.id} className="flex items-center flex-1 min-w-[2.75rem]">
+                      <div className="flex flex-col items-center gap-1 flex-1">
+                        <div
+                          className={`flex items-center justify-center rounded-full font-bold border-2 transition-all duration-300 ${
+                            compact ? 'h-6 w-6 text-[9px]' : 'h-7 w-7 text-[10px]'
+                          }`}
+                          style={{
+                            backgroundColor: completed || active ? '#22c55e' : surface,
+                            borderColor:     completed || active ? '#22c55e' : border,
+                            color:           completed || active ? '#fff' : sub,
+                            boxShadow:       active ? '0 0 0 3px rgba(34,197,94,0.20)' : 'none',
+                          }}
+                          title={`${s.eventType}\n${s.timestamp}`}
+                        >
+                          {completed ? '✓' : active ? '●' : i + 1}
+                        </div>
+                        <span
+                          className="font-medium leading-tight text-center max-w-[3.25rem] truncate"
+                          style={{
+                            fontSize: compact ? 8 : 9,
+                            color: active ? '#22c55e' : completed ? '#4ade80' : sub,
+                          }}
+                          title={s.eventType}
+                        >
+                          {s.label}
+                        </span>
+                      </div>
+                      {i < stages.length - 1 && (
+                        <div
+                          className="h-0.5 flex-1 min-w-[0.5rem] -mx-0.5 -mt-3 transition-colors duration-300"
+                          style={{ backgroundColor: completed ? '#22c55e' : border }}
+                        />
+                      )}
                     </div>
-                    <span className="text-[9px] font-medium leading-none text-center"
-                      style={{ color: active ? '#22c55e' : completed ? '#4ade80' : sub }}>
-                      {s.label}
-                    </span>
-                  </div>
-                  {i < PHASE_STEPS.length - 1 && (
-                    <div className="h-0.5 flex-1 -mx-0.5 -mt-3 transition-colors duration-300"
-                      style={{ backgroundColor: completed ? '#22c55e' : border }} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Ring + stats ── */}
           <div className="grid grid-cols-5 gap-4">

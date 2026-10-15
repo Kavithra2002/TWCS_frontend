@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   CircleMarker,
   MapContainer,
@@ -22,6 +22,7 @@ import {
 } from '@/lib/sri-lanka-map';
 
 const MARKER_COLOR = '#0d9488';
+const LABELS_PANE = 'placeLabels';
 
 function FlyToSelected({ place }: { place: SlMapPlace | null }) {
   const map = useMap();
@@ -46,16 +47,21 @@ function InvalidateSize() {
 /** Dedicated pane so label tiles sit above satellite imagery. */
 function LabelsTileLayer({ url, maxZoom }: { url: string; maxZoom?: number }) {
   const map = useMap();
+  const [paneReady, setPaneReady] = useState(() => Boolean(map.getPane(LABELS_PANE)));
 
   useEffect(() => {
-    if (!map.getPane('placeLabels')) {
-      const pane = map.createPane('placeLabels');
+    if (!map.getPane(LABELS_PANE)) {
+      const pane = map.createPane(LABELS_PANE);
       pane.style.zIndex = '450';
       pane.style.pointerEvents = 'none';
     }
+    setPaneReady(true);
   }, [map]);
 
-  return <TileLayer key={url} url={url} maxZoom={maxZoom} pane="placeLabels" opacity={1} />;
+  // Wait until the pane exists — TileLayer crashes if pane is missing on add.
+  if (!paneReady) return null;
+
+  return <TileLayer key={url} url={url} maxZoom={maxZoom} pane={LABELS_PANE} opacity={1} />;
 }
 
 export function SriLankaLeafletMap({

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { CheckCircle2, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/Field';
 import { Modal, ModalIcon } from '@/components/ui/Modal';
@@ -11,7 +11,9 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  busyLabel = 'Working…',
   danger = false,
+  icon,
   onConfirm,
   onClose,
 }: {
@@ -19,7 +21,9 @@ export function ConfirmDialog({
   title: string;
   description: string;
   confirmLabel: string;
+  busyLabel?: string;
   danger?: boolean;
+  icon?: ReactNode;
   onConfirm: () => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -49,8 +53,15 @@ export function ConfirmDialog({
       open={open}
       title={title}
       description={description}
-      icon={<ModalIcon icon={TriangleAlert} tone={danger ? 'danger' : 'tea'} />}
-      onClose={onClose}
+      icon={
+        icon ?? (
+          <ModalIcon
+            icon={danger ? TriangleAlert : CheckCircle2}
+            tone={danger ? 'danger' : 'tea'}
+          />
+        )
+      }
+      onClose={busy ? () => undefined : onClose}
       panelClassName="max-w-md"
       footer={
         <>
@@ -58,7 +69,7 @@ export function ConfirmDialog({
             Cancel
           </Button>
           <Button variant={danger ? 'danger' : 'primary'} type="button" onClick={() => void confirm()} disabled={busy}>
-            {busy ? 'Working…' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </Button>
         </>
       }

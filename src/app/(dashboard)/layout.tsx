@@ -6,6 +6,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { DataStatusProvider } from '@/components/providers/DataStatusProvider';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
+import { RoleGate } from '@/components/providers/RoleGate';
 import { SimulatorProvider } from '@/contexts/SimulatorContext';
 import { PhaseAlertProvider } from '@/contexts/PhaseAlertContext';
 
@@ -46,7 +47,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <Topbar onMenu={() => setMenuOpen(true)} />
                 </div>
                 <main className="mx-auto w-full max-w-[1600px] flex-1 px-3 py-3">
-                  {children}
+                  <RoleGate>{children}</RoleGate>
                 </main>
               </div>
             </PhaseAlertProvider>

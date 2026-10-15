@@ -23,12 +23,25 @@ export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 
 // ── Users & master data ─────────────────────────────────────────────────────
 
+/** Executive stays role=executive; designation selects Normal vs General Manager. */
+export type ExecutiveDesignation = 'standard' | 'general_manager';
+
+export interface ExecutiveConfig {
+  designation: ExecutiveDesignation;
+  troughIds: string[];
+  canViewLiveMonitoring: boolean;
+  canExportReports: boolean;
+  receiveAlertDigest: boolean;
+  notes?: string | null;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: string;
   isActive?: boolean;
+  executiveConfig?: ExecutiveConfig | null;
   createdAt?: string;
   updatedAt?: string;
 }

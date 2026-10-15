@@ -5,6 +5,19 @@ export function fmtNumber(value: number | null | undefined, decimals = 1): strin
   return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+/** Display code for a trough: `WT-01` / `trough-01` → `Trough-01`. */
+export function fmtTroughCode(code: string | null | undefined): string {
+  if (!code) return '—';
+  const digits = code.match(/(\d+)\s*$/)?.[1];
+  if (digits) return `Trough-${digits.padStart(2, '0')}`;
+  return code;
+}
+
+/** Stable plant code used in DB / demo stores. */
+export function troughPlantCode(n: number): string {
+  return `Trough-${String(n).padStart(2, '0')}`;
+}
+
 export const fmtTime = (iso: string | number | Date) => format(new Date(iso), 'HH:mm');
 export const fmtTimeSec = (iso: string | number | Date) => format(new Date(iso), 'HH:mm:ss');
 export const fmtDateTime = (iso: string | number | Date) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
