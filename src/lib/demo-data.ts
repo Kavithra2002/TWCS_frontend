@@ -117,7 +117,7 @@ function buildStore() {
   // No troughs running today — sessions appear once operators start a run.
   for (let i = 1; i <= 6; i++) {
     const id = `trough-${String(i).padStart(2, '0')}`;
-    const code = `WT-${String(i).padStart(2, '0')}`;
+    const code = `Trough-${String(i).padStart(2, '0')}`;
     const status: TroughStatus = i === 6 ? 'MAINTENANCE' : 'IDLE';
     troughs.push({
       id,

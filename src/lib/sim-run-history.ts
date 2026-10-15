@@ -1,4 +1,5 @@
 import type { SimPoint, SimTroughData } from '@/lib/sim-data';
+import { troughPlantCode } from '@/lib/format';
 import type { Batch } from '@/types';
 
 const STORAGE_KEY = 'twcs.sim-run-history.v4';
@@ -106,7 +107,7 @@ export function buildSimRunRecord(
 }
 
 export function simRunToBatch(record: SimRunRecord, troughId?: string): Batch {
-  const code = `WT-${String(record.troughNumber).padStart(2, '0')}`;
+  const code = troughPlantCode(record.troughNumber);
   return {
     id: record.id,
     code: `RUN-${code}`,

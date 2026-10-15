@@ -23,7 +23,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { getPhase, useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
 import { qs } from '@/lib/api';
-import { fmtDateTime, fmtDuration, fmtNumber } from '@/lib/format';
+import { fmtDateTime, fmtDuration, fmtNumber, troughPlantCode } from '@/lib/format';
 import { isSimSessionFinished, simRunToBatch } from '@/lib/sim-run-history';
 import type { Batch, BatchStatus, Trough } from '@/types';
 
@@ -81,7 +81,7 @@ function simToOngoingBatch(
 ): Batch {
   const session = sim.data.session;
   const n = session.trough_number;
-  const code = `WT-${String(n).padStart(2, '0')}`;
+  const code = troughPlantCode(n);
   const point = sim.data.timeSeries[sim.idx] ?? sim.data.timeSeries[0];
   const first = sim.data.timeSeries[0];
   const startMs = Date.parse(session.session_start);
@@ -162,17 +162,25 @@ export default function BatchesPage() {
   const { data, error, mutate } = useSWR<Batch[]>(key, { refreshInterval: 3_000, keepPreviousData: true });
   const { data: troughs } = useSWR<Trough[]>('/troughs', { refreshInterval: 3_000 });
 
-  const troughByCode = useMemo(
-    () => new Map((troughs ?? []).map((t) => [t.code, t])),
-    [troughs],
-  );
+  const troughByCode = useMemo(() => {
+    const map = new Map<string, Trough>();
+    for (const t of troughs ?? []) {
+      map.set(t.code, t);
+      const n = Number(t.code.replace(/\D/g, ''));
+      if (Number.isFinite(n) && n >= 1) {
+        map.set(troughPlantCode(n), t);
+        map.set(`WT-${String(n).padStart(2, '0')}`, t);
+      }
+    }
+    return map;
+  }, [troughs]);
 
   const liveOngoing = useMemo(() => {
     if (!simState.loaded || !range.includesToday) return [] as Batch[];
     return Object.values(simState.troughs)
       .filter((t) => (t.running || t.idx > 0) && !isSimSessionFinished(t))
       .map((t) => {
-        const code = `WT-${String(t.data.session.trough_number).padStart(2, '0')}`;
+        const code = troughPlantCode(t.data.session.trough_number);
         return simToOngoingBatch(t, troughByCode.get(code), getWallStartedAt(t.data.id));
       })
       .filter((b) => matchesAppliedDays(b, range.days))
@@ -192,7 +200,7 @@ export default function BatchesPage() {
         return true;
       })
       .map((r) => {
-        const code = `WT-${String(r.troughNumber).padStart(2, '0')}`;
+        const code = troughPlantCode(r.troughNumber);
         return simRunToBatch(r, troughByCode.get(code)?.id);
       });
   }, [runHistory, range.from, range.to, range.days, troughByCode]);
