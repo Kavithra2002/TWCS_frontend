@@ -256,3 +256,64 @@ export interface AlertEvent {
   value: number | null;
   createdAt: string;
 }
+
+// ── Test Version (MQTT publisher + VBox DB poll) ─────────────────────────────
+// Mirrors backend/src/modules/test-version/test-version.service.ts
+
+export type TestVersionPublishKind = 'session' | 'events' | 'timeseries';
+
+export interface TestVersionLogEntry {
+  at: string;
+  kind: TestVersionPublishKind;
+  topic: string;
+  sampleId?: string;
+  index?: number;
+  total?: number;
+  ok: boolean;
+  error?: string;
+  payload?: unknown;
+}
+
+export interface DbLiveSnapshotCounts {
+  sessions: number;
+  events: number;
+  time_series: number;
+}
+
+/** Rows returned from VBox Postgres (`SELECT *` / explicit column lists). */
+export type DbLiveSnapshotRow = Record<string, unknown>;
+
+export interface DbLiveSnapshot {
+  polledAt: string | null;
+  ok: boolean;
+  error: string | null;
+  session: DbLiveSnapshotRow | null;
+  events: DbLiveSnapshotRow[];
+  timeSeries: DbLiveSnapshotRow[];
+  counts: DbLiveSnapshotCounts;
+}
+
+export interface TestVersionStatus {
+  running: boolean;
+  connected: boolean;
+  brokerUrl: string;
+  clientId: string;
+  topics: { session: string; events: string; timeseries: string };
+  intervalMs: number;
+  troughId: string | null;
+  witheringId: string | null;
+  sampleIndex: number;
+  sampleTotal: number;
+  startedAt: string | null;
+  lastError: string | null;
+  lastSent: { at: string; kind: TestVersionPublishKind; topic: string; payload: unknown } | null;
+  recentSent: TestVersionLogEntry[];
+  db: DbLiveSnapshot;
+  log: TestVersionLogEntry[];
+  tunnelHint: string;
+}
+
+export interface TestVersionTrough {
+  id: string;
+  available: boolean;
+}
