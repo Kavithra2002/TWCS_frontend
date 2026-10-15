@@ -1,5 +1,7 @@
 // Mirrors the backend DTOs. Keep in sync with backend/src/modules/*.
 
+// ── Enums (match Prisma) ────────────────────────────────────────────────────
+
 export type TroughStatus = 'IDLE' | 'RUNNING' | 'MAINTENANCE' | 'OFFLINE';
 export type SensorType =
   | 'AIR_TEMPERATURE'
@@ -18,6 +20,8 @@ export type ScheduleAction =
   | 'LEAF_TURNING'
   | 'MAINTENANCE';
 export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+// ── Users & master data ─────────────────────────────────────────────────────
 
 export interface User {
   id: string;
@@ -40,12 +44,13 @@ export interface ScreenView {
   updatedAt: string;
 }
 
-export interface ScreenAssignee {
+export interface MasterScreenAssignee {
   id: string;
   name: string;
   email: string;
 }
 
+/** Screen definition with nested views and users assigned via UserScreen. */
 export interface MasterScreen {
   id: string;
   code: string;
@@ -54,7 +59,28 @@ export interface MasterScreen {
   createdAt: string;
   updatedAt: string;
   views: ScreenView[];
-  assignedUsers: ScreenAssignee[];
+  assignedUsers: MasterScreenAssignee[];
+}
+
+// ── Factories & troughs ───────────────────────────────────────────────────────
+
+export interface Factory {
+  id: string;
+  code: string;
+  name: string;
+  location: string | null;
+  createdAt: string;
+}
+
+export interface Trough {
+  id: string;
+  code: string;
+  name: string;
+  factoryId: string;
+  capacityKg: number;
+  status: TroughStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LatestReading {
@@ -71,26 +97,18 @@ export interface Sensor {
   minThreshold: number | null;
   maxThreshold: number | null;
   isActive: boolean;
+  createdAt?: string;
 }
 
 export interface SensorWithLatest extends Sensor {
   latest: LatestReading | null;
 }
 
-export interface Trough {
-  id: string;
-  code: string;
-  name: string;
-  factoryId: string;
-  capacityKg: number;
-  status: TroughStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface TroughWithLive extends Trough {
   sensors: SensorWithLatest[];
 }
+
+// ── Batches ───────────────────────────────────────────────────────────────────
 
 export interface Batch {
   id: string;
@@ -107,10 +125,14 @@ export interface Batch {
   endedAt: string | null;
   notes: string | null;
   createdAt: string;
+  updatedAt?: string;
+  /** Live leaf moisture while WITHERING; otherwise same as finalMoisture when completed. */
   currentMoisture: number | null;
   progressPct: number | null;
   elapsedMinutes: number | null;
 }
+
+// ── Schedules ───────────────────────────────────────────────────────────────────
 
 export interface Schedule {
   id: string;
@@ -124,13 +146,28 @@ export interface Schedule {
   setpoint: number | null;
   enabled: boolean;
   lastRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ScheduleDayState = 'UPCOMING' | 'ACTIVE' | 'DONE';
+
+export interface ScheduleTodayItem extends Schedule {
+  state: ScheduleDayState;
 }
 
 export interface TodaySchedules {
   now: string;
   weekday: number;
   timeZone: string;
-  items: (Schedule & { state: 'UPCOMING' | 'ACTIVE' | 'DONE' })[];
+  items: ScheduleTodayItem[];
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+
+export interface AlertAcknowledgedBy {
+  id: string;
+  name: string;
 }
 
 export interface Alert {
@@ -144,14 +181,22 @@ export interface Alert {
   value: number | null;
   acknowledged: boolean;
   acknowledgedAt: string | null;
-  acknowledgedBy: { id: string; name: string } | null;
+  acknowledgedBy: AlertAcknowledgedBy | null;
   createdAt: string;
 }
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export interface DashboardOverview {
   generatedAt: string;
   kpis: {
-    troughs: { total: number; running: number; idle: number; maintenance: number; offline: number };
+    troughs: {
+      total: number;
+      running: number;
+      idle: number;
+      maintenance: number;
+      offline: number;
+    };
     averages: {
       airTemperature: number | null;
       leafTemperature: number | null;
@@ -166,6 +211,8 @@ export interface DashboardOverview {
   recentAlerts: Alert[];
 }
 
+// ── Telemetry / charts ────────────────────────────────────────────────────────
+
 export interface SeriesPoint {
   t: string;
   avg: number;
@@ -178,11 +225,18 @@ export interface SeriesResponse {
   from: string;
   to: string;
   bucketSeconds: number;
-  summary: { min: number; max: number; avg: number; samples: number } | null;
+  summary: {
+    min: number;
+    max: number;
+    avg: number;
+    samples: number;
+  } | null;
   points: SeriesPoint[];
 }
 
-// Socket.IO payloads
+// ── Realtime (Socket.IO) ──────────────────────────────────────────────────────
+
+/** Payload of the `reading` socket event (`telemetry.reading.recorded`). */
 export interface ReadingEvent {
   sensorId: string;
   troughId: string;
@@ -192,6 +246,7 @@ export interface ReadingEvent {
   recordedAt: string;
 }
 
+/** Payload of the `alert` socket event (`alert.raised`). */
 export interface AlertEvent {
   id: string;
   troughId: string;
