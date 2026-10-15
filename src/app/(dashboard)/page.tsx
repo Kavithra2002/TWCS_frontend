@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import useSWR from 'swr';
 import { Bell, Droplets, Layers, Leaf, Scale, Thermometer } from 'lucide-react';
-import { SriLankaWeatherMap } from '@/components/climate/SriLankaWeatherMap';
+import { SriLankaMap } from '@/components/climate/SriLankaMap';
 import { StatusDonut } from '@/components/charts/StatusDonut';
 import { KpiCard } from '@/components/indicators/KpiCard';
 import { Card } from '@/components/ui/Card';
@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
       {/* 3-column grid: left 2 cols stacked, right col alongside */}
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        {/* Left column: withering troughs + Sri Lanka live weather map */}
+        {/* Left column: withering troughs + Sri Lanka live map */}
         <div className="flex flex-col gap-3 xl:col-span-2">
           <Card
             title="Withering troughs"
@@ -62,7 +62,7 @@ export default function DashboardPage() {
               <TroughList troughs={simTroughs} />
             )}
           </Card>
-          <SriLankaWeatherMap />
+          <SriLankaMap />
         </div>
 
         {/* Right column */}
