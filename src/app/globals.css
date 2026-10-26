@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 /* ─── CSS tokens ───────────────────────────────────────────────────── */
+html {
+  --font-ui: var(--font-inter);
+}
+html[lang='si'] {
+  --font-ui: var(--font-sinhala), var(--font-inter);
+}
+html[lang='ta'] {
+  --font-ui: var(--font-tamil), var(--font-inter);
+}
+
 :root {
   color-scheme: dark;
   /* Neutral zinc scale */
@@ -191,10 +201,28 @@ html.light .running-glow {
   will-change: width;
 }
 
+@keyframes live-row-arrive {
+  0% { transform: translateY(-14px); }
+  100% { transform: translateY(0); }
+}
+.live-row-arrive {
+  animation: live-row-arrive 0.55s ease-out;
+}
+
 /* ─── Recharts ───────────────────────────────────────────────────── */
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 .recharts-text { fill: #a1a1aa; font-size: 11px; }
 html.light .recharts-text { fill: #52525b; }
+
+/* Changed reading: a short yellow fill. The number stays dark on the light theme. */
+.reading-flash {
+  background: rgba(251, 191, 36, 0.28);
+}
+html.light .reading-flash {
+  background: #fde68a;
+}
+html.light .reading-flash .reading-value { color: #1c1917; }
+html.light .reading-flash .reading-unit { color: #44403c; }
 
 /* ─── Sri Lanka map place labels ─────────────────────────────────── */
 .sl-map-label {

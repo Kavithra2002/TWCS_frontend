@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import estate from '@/images/4f3265e534371093b0b8717c1a9dd035.jpg';
 import logo from '@/images/logo.jpeg';
+import { LanguageSelect } from '@/components/layout/LanguageSelect';
+import { useLanguage } from '@/components/providers/LanguageProvider';
 import { ApiError, api } from '@/lib/api';
 import { setSession } from '@/lib/auth';
 import type { User } from '@/types';
@@ -64,6 +66,7 @@ export default function LoginPage() {
 
 function SignInForm() {
   const router = useRouter();
+  const { t } = useLanguage();
   const emailId = useId();
   const passwordId = useId();
   const resetEmailId = useId();
@@ -92,8 +95,8 @@ function SignInForm() {
   }, []);
 
   function validateEmail(value: string) {
-    if (!value.trim()) return 'Enter your email.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'Enter a valid email address.';
+    if (!value.trim()) return t.login.emailRequired;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return t.login.emailInvalid;
     return '';
   }
 
@@ -101,7 +104,7 @@ function SignInForm() {
     event.preventDefault();
     const next = {
       email: validateEmail(email),
-      password: password ? '' : 'Enter your password.',
+      password: password ? '' : t.login.passwordRequired,
     };
     setErrors(next);
     if (next.email || next.password) return;
@@ -122,7 +125,7 @@ function SignInForm() {
       setSession(result.token, result.user);
       router.push('/');
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : 'Could not sign in. Check that the API is running.';
+      const message = error instanceof ApiError ? error.message : t.login.signInFailed;
       setErrors({ form: message });
       setSubmitting(false);
     }
@@ -134,17 +137,20 @@ function SignInForm() {
     setErrors({ email: emailError });
     setResetNote('');
     if (emailError) return;
-    setResetNote('Password reset is not available yet.');
+    setResetNote(t.login.resetUnavailable);
   }
 
   if (mode === 'reset') {
     return (
       <div className="w-full">
-        <h1 className="text-center font-welcome text-[1.35rem] font-medium tracking-tight text-[#1c1c1c]">Reset password</h1>
-        <p className="mt-2 text-center text-sm text-[#8d8d8d]">Enter the work email on your TWCS account.</p>
+        <div className="mb-4 flex justify-end">
+          <LanguageSelect tone="light" />
+        </div>
+        <h1 className="text-center font-welcome text-[1.35rem] font-medium tracking-tight text-[#1c1c1c]">{t.login.resetTitle}</h1>
+        <p className="mt-2 text-center text-sm text-[#8d8d8d]">{t.login.resetHint}</p>
         <form className="mt-4" onSubmit={onReset} noValidate>
           <label htmlFor={resetEmailId} className="sr-only">
-            Email
+            {t.login.email}
           </label>
           <div className="relative">
             <input
@@ -160,7 +166,7 @@ function SignInForm() {
                 setErrors({});
                 setResetNote('');
               }}
-              placeholder="Email"
+              placeholder={t.login.email}
               className={clsx(fieldClass(!!errors.email), 'pr-12')}
             />
             <Mail className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#b0b0b0]" />
@@ -172,7 +178,7 @@ function SignInForm() {
             </p>
           )}
           <button type="submit" className={primaryButtonClass}>
-            Send reset link
+            {t.login.sendReset}
           </button>
         </form>
         <button
@@ -184,7 +190,7 @@ function SignInForm() {
           }}
           className="mt-5 w-full text-center text-sm text-[#8d8d8d] hover:text-[#1c1c1c]"
         >
-          Back to log in
+          {t.login.backToLogin}
         </button>
       </div>
     );
@@ -192,21 +198,24 @@ function SignInForm() {
 
   return (
     <div className="w-full">
+      <div className="mb-3 flex justify-end">
+        <LanguageSelect tone="light" />
+      </div>
       <Image src={logo} alt="TWCS" priority className="mx-auto mb-4 h-auto w-[150px]" />
       <h1 className="text-center font-welcome text-[2rem] font-medium leading-none tracking-tight text-[#1c1c1c]">
-        Welcome back
+        {t.login.welcome}
       </h1>
-      <p className="mt-2 text-center text-sm text-[#6b6b6b]">Please enter your details.</p>
+      <p className="mt-2 text-center text-sm text-[#6b6b6b]">{t.login.details}</p>
       {sessionExpired && (
         <p className="mt-4 text-center text-sm leading-relaxed text-[#b42318]" role="alert">
-          Your session expired. Log in again to continue.
+          {t.login.sessionExpired}
         </p>
       )}
 
       <form className="mt-6" onSubmit={onSignIn} noValidate>
         <div>
           <label htmlFor={emailId} className="mb-1.5 block text-sm font-medium text-[#24382c]">
-            Email
+            {t.login.email}
           </label>
           <div className="relative">
             <input
@@ -221,7 +230,7 @@ function SignInForm() {
                 setEmail(event.target.value);
                 setErrors((current) => ({ ...current, email: undefined, form: undefined }));
               }}
-              placeholder="name@factory.com"
+              placeholder={t.login.emailPlaceholder}
               className={clsx(fieldClass(!!errors.email), 'pr-11')}
             />
             <Mail className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8a8a]" />
@@ -231,7 +240,7 @@ function SignInForm() {
 
         <div className="mt-4">
           <label htmlFor={passwordId} className="mb-1.5 block text-sm font-medium text-[#24382c]">
-            Password
+            {t.login.password}
           </label>
           <div className="relative">
             <input
@@ -244,14 +253,14 @@ function SignInForm() {
                 setPassword(event.target.value);
                 setErrors((current) => ({ ...current, password: undefined, form: undefined }));
               }}
-              placeholder="Enter your password"
+              placeholder={t.login.passwordPlaceholder}
               className={clsx(fieldClass(!!errors.password), 'pr-11')}
             />
             <button
               type="button"
               onClick={() => setShowPassword((value) => !value)}
               className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[#8a8a8a] hover:text-[#1c1c1c]"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? t.login.hidePassword : t.login.showPassword}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -269,7 +278,7 @@ function SignInForm() {
               onChange={(event) => setRemember(event.target.checked)}
               className="h-4 w-4 rounded border-[#c8c8c8] text-[#f5a524] focus:ring-[#f5a524]"
             />
-            Remember for 30 days
+            {t.login.remember}
           </label>
           <button
             type="button"
@@ -279,7 +288,7 @@ function SignInForm() {
             }}
             className="shrink-0 font-medium text-[#1a6b40] hover:underline"
           >
-            Forgot password?
+            {t.login.forgot}
           </button>
         </div>
 
@@ -290,7 +299,7 @@ function SignInForm() {
         )}
 
         <button type="submit" className={primaryButtonClass} disabled={submitting}>
-          {submitting ? 'Logging in…' : 'Log in'}
+          {submitting ? t.login.loggingIn : t.login.logIn}
         </button>
       </form>
     </div>

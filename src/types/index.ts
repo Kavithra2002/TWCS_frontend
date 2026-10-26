@@ -306,6 +306,31 @@ export interface DbLiveSnapshot {
   counts: DbLiveSnapshotCounts;
 }
 
+/** One droplet `raw_vbox_data` row (VNet sample stored by the subscriber). */
+export interface RawVboxRow {
+  id: number;
+  receivedAt: string;
+  payload: Record<string, unknown>;
+}
+
+export interface FeedStatusEvent {
+  at: string;
+  state: 'connected' | 'disconnected';
+  reason: string;
+}
+
+export interface RawLiveFeed {
+  polledAt: string | null;
+  dbConnected: boolean;
+  feedConnected: boolean;
+  error: string | null;
+  lastReceivedAt: string | null;
+  ageMs: number | null;
+  count: number;
+  rows: RawVboxRow[];
+  statusLog: FeedStatusEvent[];
+}
+
 export interface TestVersionStatus {
   running: boolean;
   connected: boolean;
@@ -322,6 +347,7 @@ export interface TestVersionStatus {
   lastSent: { at: string; kind: TestVersionPublishKind; topic: string; payload: unknown } | null;
   recentSent: TestVersionLogEntry[];
   db: DbLiveSnapshot;
+  live: RawLiveFeed;
   log: TestVersionLogEntry[];
   tunnelHint: string;
 }
