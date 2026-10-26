@@ -19,26 +19,29 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useLanguage } from '@/components/providers/LanguageProvider';
 import { canManageUsers, isOverviewOnlyRole } from '@/lib/auth';
+import type { Messages } from '@/lib/i18n';
 import logo from '@/images/logo.jpeg';
 
-const NAV: { href: string; label: string; icon: LucideIcon; iconClass: string; adminOnly?: boolean }[] = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, iconClass: 'bg-sky-500/20 text-sky-400' },
-  { href: '/dashboard-2', label: 'Live Monitoring', icon: LineChart, iconClass: 'bg-lime-500/20 text-lime-400' },
-  { href: '/simulator', label: 'Simulator', icon: FlaskConical, iconClass: 'bg-purple-500/20 text-purple-400' },
-  { href: '/test-version', label: 'Test Version', icon: Radio, iconClass: 'bg-orange-500/20 text-orange-400' },
-  { href: '/troughs', label: 'Troughs', icon: Layers, iconClass: 'bg-teal-500/20 text-teal-400' },
-  { href: '/batches', label: 'Batches', icon: Leaf, iconClass: 'bg-emerald-500/20 text-emerald-400' },
-  { href: '/schedules', label: 'Schedules', icon: CalendarClock, iconClass: 'bg-amber-500/20 text-amber-400' },
-  { href: '/reports', label: 'Reports', icon: FileBarChart, iconClass: 'bg-violet-500/20 text-violet-400' },
-  { href: '/settings', label: 'Settings', icon: Settings, iconClass: 'bg-indigo-500/20 text-indigo-400' },
-  { href: '/users', label: 'Users', icon: Users, iconClass: 'bg-rose-500/20 text-rose-400', adminOnly: true },
-  { href: '/master-data', label: 'Master Data Dev', icon: Database, iconClass: 'bg-cyan-500/20 text-cyan-400' },
+const NAV: { href: string; labelKey: keyof Messages['nav']; icon: LucideIcon; iconClass: string; adminOnly?: boolean }[] = [
+  { href: '/', labelKey: 'overview', icon: LayoutDashboard, iconClass: 'bg-sky-500/20 text-sky-400' },
+  { href: '/dashboard-2', labelKey: 'live', icon: LineChart, iconClass: 'bg-lime-500/20 text-lime-400' },
+  { href: '/simulator', labelKey: 'simulator', icon: FlaskConical, iconClass: 'bg-purple-500/20 text-purple-400' },
+  { href: '/test-version', labelKey: 'test', icon: Radio, iconClass: 'bg-orange-500/20 text-orange-400' },
+  { href: '/troughs', labelKey: 'troughs', icon: Layers, iconClass: 'bg-teal-500/20 text-teal-400' },
+  { href: '/batches', labelKey: 'batches', icon: Leaf, iconClass: 'bg-emerald-500/20 text-emerald-400' },
+  { href: '/schedules', labelKey: 'schedules', icon: CalendarClock, iconClass: 'bg-amber-500/20 text-amber-400' },
+  { href: '/reports', labelKey: 'reports', icon: FileBarChart, iconClass: 'bg-violet-500/20 text-violet-400' },
+  { href: '/settings', labelKey: 'settings', icon: Settings, iconClass: 'bg-indigo-500/20 text-indigo-400' },
+  { href: '/users', labelKey: 'users', icon: Users, iconClass: 'bg-rose-500/20 text-rose-400', adminOnly: true },
+  { href: '/master-data', labelKey: 'masterData', icon: Database, iconClass: 'bg-cyan-500/20 text-cyan-400' },
 ];
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const overviewOnly = isOverviewOnlyRole(user);
   const items = overviewOnly
     ? NAV.filter((item) => item.href === '/')
@@ -69,7 +72,8 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 pt-1">
-        {items.map(({ href, label, icon: Icon, iconClass }) => {
+        {items.map(({ href, labelKey, icon: Icon, iconClass }) => {
+          const label = t.nav[labelKey];
           const active = isActive(href);
           return (
             <Link
