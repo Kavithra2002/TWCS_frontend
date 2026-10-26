@@ -7,19 +7,25 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useDataStatus } from '@/components/providers/DataStatusProvider';
 import { AlertDropdown } from '@/components/layout/AlertDropdown';
 import { format } from 'date-fns';
+import { LanguageSelect } from '@/components/layout/LanguageSelect';
+import { useLanguage } from '@/components/providers/LanguageProvider';
+import { fill, type Lang, type Messages } from '@/lib/i18n';
 
-function formatAgo(seconds: number): string {
-  if (seconds < 1) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
+const DATE_LOCALES: Record<Lang, string> = { en: 'en-GB', si: 'si-LK', ta: 'ta-LK' };
+
+function formatAgo(seconds: number, labels: Messages['topbar']): string {
+  if (seconds < 1) return labels.justNow;
+  if (seconds < 60) return fill(labels.secondsAgo, { n: seconds });
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  if (m < 60) return s > 0 ? `${m}m ${s}s ago` : `${m}m ago`;
+  if (m < 60) return s > 0 ? fill(labels.minutesSecondsAgo, { m, s }) : fill(labels.minutesAgo, { n: m });
   const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m ago`;
+  return fill(labels.hoursMinutesAgo, { h, m: m % 60 });
 }
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();
+  const { lang, t } = useLanguage();
   const { lastUpdatedAt, refreshing, refresh } = useDataStatus();
   const [now, setNow] = useState<Date | null>(null);
   const [agoSec, setAgoSec] = useState(0);
@@ -43,7 +49,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         <button
           onClick={onMenu}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100 lg:hidden"
-          aria-label="Open menu"
+          aria-label={t.topbar.openMenu}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -63,15 +69,15 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             )}
           />
           <span className="font-medium tabular-nums text-slate-300">
-            {refreshing ? 'Updating…' : `Updated ${formatAgo(agoSec)}`}
+            {refreshing ? t.topbar.updating : fill(t.topbar.updated, { time: formatAgo(agoSec, t.topbar) })}
           </span>
           <button
             type="button"
             onClick={() => void refresh()}
             disabled={refreshing}
             className="ml-0.5 rounded-full p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-slate-100 disabled:opacity-50"
-            aria-label="Refresh data"
-            title="Refresh data"
+            aria-label={t.topbar.refresh}
+            title={t.topbar.refresh}
           >
             <RefreshCw className={clsx('h-3.5 w-3.5', refreshing && 'animate-spin')} />
           </button>
@@ -82,7 +88,9 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         {now && (
           <div className="hidden text-right sm:block">
             <p className="font-mono text-sm tabular-nums text-slate-100">{format(now, 'HH:mm:ss')}</p>
-            <p className="text-[11px] text-slate-500">{format(now, 'EEE, dd MMM yyyy')}</p>
+            <p className="text-[11px] text-slate-500">
+              {new Intl.DateTimeFormat(DATE_LOCALES[lang], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).format(now)}
+            </p>
           </div>
         )}
 
@@ -95,6 +103,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
 
         <AlertDropdown />
 
+        <LanguageSelect />
+
         <button
           onClick={() => {
             const next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
@@ -102,8 +112,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             localStorage.setItem('twcs.theme', next);
           }}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
-          aria-label="Toggle color theme"
-          title="Toggle color theme"
+          aria-label={t.topbar.toggleTheme}
+          title={t.topbar.toggleTheme}
         >
           <Sun className="theme-icon-sun h-4 w-4" />
           <Moon className="theme-icon-moon h-4 w-4" />
@@ -112,8 +122,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         <button
           onClick={logout}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
-          aria-label="Log out"
-          title="Log out"
+          aria-label={t.topbar.logOut}
+          title={t.topbar.logOut}
         >
           <LogOut className="h-4 w-4" />
         </button>
