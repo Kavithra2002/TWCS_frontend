@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { getPhase, type SimTroughState } from '@/contexts/SimulatorContext';
+import { isLiveTroughId, playback } from '@/lib/live-trough';
 import { fmtDuration, fmtNumber } from '@/lib/format';
 import type { SimPoint, SimTroughData } from '@/lib/sim-data';
 import { Card } from '@/components/ui/Card';
@@ -153,23 +154,30 @@ interface TroughRunSummary {
 }
 
 function hasProgress(t: SimTroughState): boolean {
+  if (isLiveTroughId(t.data.id)) return t.livePoints.length > 0;
   return t.running || t.idx > 0;
 }
 
 function progressedSeries(t: SimTroughState): SimPoint[] {
+  if (isLiveTroughId(t.data.id)) return t.livePoints;
   if (!hasProgress(t)) return [];
   return t.data.timeSeries.slice(0, t.idx + 1);
 }
 
 function buildSummary(t: SimTroughState, color: string): TroughRunSummary {
-  const { data, idx, running } = t;
-  const { session, events, timeSeries } = data;
-  const currentPoint = timeSeries[idx] ?? timeSeries[0];
-  const startMs = Date.parse(session.session_start);
+  const { data, running } = t;
+  const { session, events } = data;
+  const played = playback(t);
+  const currentPoint = played.point;
+  const startMs = played.live && played.series[0]
+    ? Date.parse(played.series[0].timestamp)
+    : Date.parse(session.session_start);
   const atMs = Date.parse(currentPoint?.timestamp ?? session.session_start);
   const durationMin = Math.max(0, Math.round((atMs - startMs) / 60_000));
-  const finalWs = currentPoint?.current_ws_pct ?? 100;
-  const phase = getPhase(session, events, currentPoint?.timestamp ?? session.session_start);
+  const finalWs = currentPoint?.current_ws_pct ?? (played.live ? session.target_ws_pct : 100);
+  const phase = played.live || !currentPoint
+    ? null
+    : getPhase(session, events, currentPoint.timestamp ?? session.session_start);
   const started = hasProgress(t);
 
   return {
@@ -180,7 +188,7 @@ function buildSummary(t: SimTroughState, color: string): TroughRunSummary {
     deltaTarget: finalWs - session.target_ws_pct,
     durationMin,
     energyKwh: currentPoint?.cumulative_energy_kwh ?? null,
-    isDone: started && phase === 'DONE' && !running,
+    isDone: !played.live && started && phase === 'DONE' && !running,
   };
 }
 
@@ -192,9 +200,11 @@ function buildTrendRows(
   const map = new Map<number, Record<string, number>>();
 
   for (const t of selected) {
-    const startMs = Date.parse(t.data.session.session_start);
-    const startWeight = t.data.session.starting_weight_kg;
     const progressed = progressedSeries(t);
+    const startMs = isLiveTroughId(t.data.id) && progressed[0]
+      ? Date.parse(progressed[0].timestamp)
+      : Date.parse(t.data.session.session_start);
+    const startWeight = t.data.session.starting_weight_kg;
     const samples = progressiveSample(progressed, t.data.timeSeries.length, CHART_POINTS);
 
     for (let i = 0; i < samples.length; i++) {
@@ -507,7 +517,8 @@ export function TroughComparison({ troughs }: Props) {
     for (const t of source) {
       const startWeight = t.data.session.starting_weight_kg;
       // Sample the full series sparsely — domain must not depend on live idx.
-      const full = progressiveSample(t.data.timeSeries, t.data.timeSeries.length, CHART_POINTS);
+      const fullSeries = isLiveTroughId(t.data.id) ? t.livePoints : t.data.timeSeries;
+      const full = progressiveSample(fullSeries, fullSeries.length, CHART_POINTS);
       for (const p of full) {
         for (const m of METRIC_OPTIONS) {
           const v = pickMetric(p, m.value, startWeight);
@@ -531,7 +542,9 @@ export function TroughComparison({ troughs }: Props) {
   }, [selected, sorted]);
 
   // Rebuild when any selected trough's idx advances (point-by-point live draw).
-  const progressKey = activeSelected.map((t) => `${t.data.id}:${t.idx}`).join('|');
+  const progressKey = activeSelected
+    .map((t) => `${t.data.id}:${isLiveTroughId(t.data.id) ? t.livePoints.length : t.idx}`)
+    .join('|');
 
   const trendByMetric = useMemo(() => {
     const out = {} as Record<
