@@ -121,33 +121,41 @@ export function TroughRingCard({
   troughState: SimTroughState;
   onView?: () => void;
 }) {
-  const { data, idx, running } = troughState;
+  const { data, idx, running, livePoints } = troughState;
   const { session, events, timeSeries } = data;
+  const live = data.id === 't06';
+  const points = live ? livePoints : timeSeries;
   const isDark = useIsDark();
 
   const trackColor      = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)';
   const trackInnerColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)';
 
-  const started = running || idx > 0;
-  const point   = timeSeries[idx] ?? timeSeries[0];
+  const hasReading = live ? points.length > 0 : true;
+  const started = live ? hasReading : running || idx > 0;
+  const point   = live ? points[points.length - 1] ?? null : timeSeries[idx] ?? timeSeries[0];
 
-  const ws     = point?.current_ws_pct ?? 100;
-  const weight = point?.weight_kg      ?? session.starting_weight_kg;
-  const temp   = point?.upper_temp_c   ?? point?.ambient_temp_c ?? null;
-  const rh     = point?.upper_rh_pct   ?? point?.ambient_rh_pct ?? null;
-  const fanHz  = point?.fan_speed_hz   ?? null;
+  const ws     = hasReading ? (point?.current_ws_pct ?? (live ? null : 100)) : null;
+  const weight = hasReading ? (point?.weight_kg ?? (live ? null : session.starting_weight_kg)) : null;
+  const temp   = hasReading ? (point?.upper_temp_c ?? point?.ambient_temp_c ?? null) : null;
+  const rh     = hasReading ? (point?.upper_rh_pct ?? point?.ambient_rh_pct ?? null) : null;
+  const fanHz  = hasReading ? (point?.fan_speed_hz ?? null) : null;
 
+  const originMs = live && points[0] ? Date.parse(points[0].timestamp) : Date.parse(session.session_start);
   const elapsedH = point?.timestamp
-    ? Math.round(((Date.parse(point.timestamp) - Date.parse(session.session_start)) / 3_600_000) * 100) / 100
+    ? Math.round(((Date.parse(point.timestamp) - originMs) / 3_600_000) * 100) / 100
     : 0;
   const totalH = Math.round(
     ((Date.parse(session.session_end) - Date.parse(session.session_start)) / 3_600_000) * 100,
   ) / 100;
 
-  const phase   = started ? getPhase(session, events, point?.timestamp ?? session.session_start) : null;
+  const phase   = !live && started ? getPhase(session, events, point?.timestamp ?? session.session_start) : null;
   const phStyle = phase ? PHASE_STYLE[phase] : null;
   const status  = resolveStatus(running, started, phase);
-  const statusMeta = STATUS_META[status];
+  const statusMeta = live && running && !hasReading
+    ? { label: 'Waiting', accent: '#f59e0b' }
+    : live && hasReading && running
+      ? { label: 'Live', accent: '#22c55e' }
+      : STATUS_META[status];
 
   const clr = {
     heading:    isDark ? '#f1f5f9' : '#1e293b',
@@ -173,7 +181,7 @@ export function TroughRingCard({
     kgUnit:     isDark ? '#94a3b8' : '#64748b',
   };
 
-  const witherPct = started
+  const witherPct = started && ws != null
     ? Math.min(100, Math.round(((100 - ws) / (100 - session.target_ws_pct)) * 100))
     : 0;
   const timePct = totalH > 0 ? Math.min(100, Math.round((elapsedH / totalH) * 100)) : 0;
@@ -207,7 +215,7 @@ export function TroughRingCard({
         {/* Ring — value + label centered as one block in the inner hole */}
         <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
           <DualRing
-            ws={ws} targetWs={session.target_ws_pct}
+            ws={ws ?? 100} targetWs={session.target_ws_pct}
             elapsedH={elapsedH} totalH={totalH}
             started={started} running={running}
             trackColor={trackColor} trackInnerColor={trackInnerColor}
@@ -218,7 +226,7 @@ export function TroughRingCard({
                 className="text-[13px] font-bold tabular-nums"
                 style={{ color: started ? clr.value : clr.dimText }}
               >
-                {started ? `${Math.round(ws)}%` : '—'}
+                {started && ws != null ? `${Math.round(ws)}%` : '—'}
               </span>
               <span
                 className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider"
@@ -266,7 +274,7 @@ export function TroughRingCard({
 
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-base font-bold leading-none tabular-nums" style={{ color: started ? clr.value : clr.dimText }}>
-              {started ? (
+              {started && weight != null ? (
                 <>
                   {fmtNumber(weight, 0)}
                   <span className="ml-0.5 text-[10px] font-medium" style={{ color: clr.kgUnit }}>kg</span>
