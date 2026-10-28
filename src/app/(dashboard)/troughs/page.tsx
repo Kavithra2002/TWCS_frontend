@@ -6,6 +6,7 @@ import { TroughDetailModal } from '@/components/troughs/TroughDetailModal';
 import { TroughComparison } from '@/components/troughs/TroughComparison';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getPhase, useSimulator } from '@/contexts/SimulatorContext';
+import { hasSimProgress, isLiveTroughId } from '@/lib/live-trough';
 
 export default function TroughsPage() {
   const { state } = useSimulator();
@@ -20,9 +21,10 @@ export default function TroughsPage() {
     let ready = 0;
 
     for (const t of troughList) {
-      const started = t.running || t.idx > 0;
-      const point = t.data.timeSeries[t.idx] ?? t.data.timeSeries[0];
-      const phase = started
+      const live = isLiveTroughId(t.data.id);
+      const started = live ? hasSimProgress(t) : t.running || t.idx > 0;
+      const point = live ? t.livePoints[t.livePoints.length - 1] : t.data.timeSeries[t.idx] ?? t.data.timeSeries[0];
+      const phase = !live && started
         ? getPhase(t.data.session, t.data.events, point?.timestamp ?? t.data.session.session_start)
         : null;
 
