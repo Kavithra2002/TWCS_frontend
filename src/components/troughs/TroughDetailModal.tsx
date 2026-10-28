@@ -124,8 +124,10 @@ export function TroughDetailModal({
   onClose: () => void;
 }) {
   const isDark = useIsDark();
-  const { data, idx, running } = troughState;
-  const { session, events, timeSeries } = data;
+  const { data, idx, running, livePoints, liveError } = troughState;
+  const { session, events } = data;
+  const live = data.id === 't06';
+  const timeSeries = live ? livePoints : data.timeSeries;
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -133,12 +135,15 @@ export function TroughDetailModal({
     return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
 
-  const started  = running || idx > 0;
-  const point    = timeSeries[idx] ?? timeSeries[0];
+  const started  = live ? timeSeries.length > 0 : running || idx > 0;
+  const point    = started
+    ? (timeSeries[live ? timeSeries.length - 1 : idx] ?? timeSeries[0])
+    : null;
   const startMs  = Date.parse(session.session_start);
+  const originMs = live && timeSeries[0] ? Date.parse(timeSeries[0].timestamp) : startMs;
 
-  const ws       = point?.current_ws_pct ?? 100;
-  const weight   = point?.weight_kg ?? session.starting_weight_kg;
+  const ws       = point?.current_ws_pct ?? (started && !live ? 100 : null);
+  const weight   = point?.weight_kg ?? (started && !live ? session.starting_weight_kg : null);
   const inletT   = point?.inlet_temp_c   ?? point?.ambient_temp_c  ?? null;
   const inletRH  = point?.inlet_rh_pct   ?? point?.ambient_rh_pct  ?? null;
   const chamberT = point?.upper_temp_c   ?? null;
@@ -150,25 +155,28 @@ export function TroughDetailModal({
   const energy     = point?.cumulative_energy_kwh   ?? null;
 
   const elapsedH = point?.timestamp
-    ? Math.round(((Date.parse(point.timestamp) - startMs) / 3_600_000) * 100) / 100
+    ? Math.round(((Date.parse(point.timestamp) - originMs) / 3_600_000) * 100) / 100
     : 0;
   const totalH = Math.round(
     ((Date.parse(session.session_end) - startMs) / 3_600_000) * 100,
   ) / 100;
   const remainH = Math.max(0, totalH - elapsedH);
 
-  const phase    = started ? getPhase(session, events, point?.timestamp ?? session.session_start) : null;
+  const phase    = !live && started && point
+    ? getPhase(session, events, point.timestamp ?? session.session_start)
+    : null;
   const stages   = buildEventStages(events);
   const stageIdx = getEventStageIdx(stages, point?.timestamp ?? session.session_start, started);
   const activeStageLabel = stageIdx >= 0 ? stages[stageIdx].label : null;
 
-  const witherPct = started
+  const witherPct = started && ws != null
     ? Math.min(100, Math.round(((100 - ws) / (100 - session.target_ws_pct)) * 100))
     : 0;
   const targetWeight = Math.round(session.starting_weight_kg * session.target_ws_pct / 100);
 
   // Status
-  const statusLabel = running ? '● Running'
+  const statusLabel = live && running && !started ? 'Waiting'
+    : running ? (live ? '● Live' : '● Running')
     : phase === 'DONE' ? 'Done'
     : started ? 'Paused' : 'Ready';
   const statusColor = running ? '#4ade80'
@@ -176,13 +184,14 @@ export function TroughDetailModal({
     : started ? '#f59e0b' : '#94a3b8';
 
   // Chart data — sample to max ~150 points
-  const slice = timeSeries.slice(0, idx + 1);
+  const viewIdx = live ? Math.max(0, timeSeries.length - 1) : idx;
+  const slice = started ? timeSeries.slice(0, viewIdx + 1) : [];
   const step  = Math.max(1, Math.floor(slice.length / 150));
   const chartData = slice
-    .filter((_, i) => i % step === 0 || i === idx)
+    .filter((_, i) => i % step === 0 || i === viewIdx)
     .map((p) => ({
       h:      Math.round(((Date.parse(p.timestamp) - startMs) / 3_600_000) * 10) / 10,
-      ws:     p.current_ws_pct ?? 100,
+      ws:     p.current_ws_pct ?? 0,
       weight: p.weight_kg ?? 0,
     }));
 
@@ -337,10 +346,10 @@ export function TroughDetailModal({
                 </svg>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-2xl font-bold tabular-nums" style={{ color: text }}>
-                    {started ? `${Math.round(ws)}%` : '–'}
+                    {started && ws != null ? `${Math.round(ws)}%` : '–'}
                   </span>
                   <span className="text-[10px] mt-0.5" style={{ color: sub }}>
-                    {started ? 'Wither Std' : 'READY'}
+                    {started ? 'Wither Std' : live && running ? 'WAIT' : 'READY'}
                   </span>
                 </div>
               </div>
@@ -352,11 +361,11 @@ export function TroughDetailModal({
             {/* Stats */}
             <div className="col-span-3 grid grid-cols-1 gap-2">
               {[
-                { label: 'Time Elapsed',    value: `${elapsedH.toFixed(1)} / ${totalH.toFixed(1)} h` },
-                { label: 'Time Remaining',  value: remainH > 0 ? `${remainH.toFixed(1)} h` : 'Complete' },
-                { label: 'Current Weight',  value: `${fmtNumber(weight, 0)} kg` },
+                { label: 'Time Elapsed',    value: started ? (live ? `${elapsedH.toFixed(1)} h` : `${elapsedH.toFixed(1)} / ${totalH.toFixed(1)} h`) : '—' },
+                { label: 'Time Remaining',  value: live ? (started ? 'Live' : '—') : remainH > 0 ? `${remainH.toFixed(1)} h` : 'Complete' },
+                { label: 'Current Weight',  value: started && weight != null ? `${fmtNumber(weight, 0)} kg` : '—' },
                 { label: 'Target Weight',   value: `${fmtNumber(targetWeight, 0)} kg` },
-                { label: 'Wither Progress', value: `${witherPct}%` },
+                { label: 'Wither Progress', value: started ? `${witherPct}%` : '—' },
               ].map(({ label, value }) => (
                 <div key={label}
                   className="flex items-center justify-between rounded-lg px-3 py-2"
@@ -369,6 +378,16 @@ export function TroughDetailModal({
           </div>
 
           {/* ── WS% chart ── */}
+          {live && chartData.length <= 1 && (
+            <p className="text-xs" style={{ color: sub }}>
+              {liveError
+                ? liveError
+                : chartData.length === 0
+                  ? 'Waiting for live samples. The chart stays empty until the feed sends real readings.'
+                  : 'Chart starts when the next live sample arrives.'}
+            </p>
+          )}
+
           {chartData.length > 1 && (
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: sub }}>

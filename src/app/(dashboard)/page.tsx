@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { SimTroughOfflineRow, SimTroughRunningCard } from '@/components/troughs/SimTroughOverviewCard';
 import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
+import { hasSimProgress } from '@/lib/live-trough';
 import { isOverviewOnlyRole, overviewTitleForRole, roleLabel } from '@/lib/auth';
 import { fmtNumber } from '@/lib/format';
 import { SCHEDULE_ACTION_STYLE, SENSOR_META, TROUGH_STATUS_STYLE } from '@/lib/sensors';
@@ -59,8 +60,8 @@ function SuperAdminOverview() {
 
   const simTroughs = Object.values(simState.troughs);
   const simRunning = simTroughs.filter((t) => t.running).length;
-  const simPaused  = simTroughs.filter((t) => !t.running && t.idx > 0).length;
-  const simReady   = simTroughs.filter((t) => !t.running && t.idx === 0).length;
+  const simPaused  = simTroughs.filter((t) => !t.running && hasSimProgress(t)).length;
+  const simReady   = simTroughs.filter((t) => !t.running && !hasSimProgress(t)).length;
   const simTotal   = simTroughs.length;
 
   return (
@@ -128,8 +129,8 @@ function SuperAdminOverview() {
 
 // ── Trough list: running = full cards, offline = compact rows ─────────────────
 function TroughList({ troughs }: { troughs: SimTroughState[] }) {
-  const active  = troughs.filter((t) => t.running || t.idx > 0);
-  const offline = troughs.filter((t) => !t.running && t.idx === 0);
+  const active  = troughs.filter((t) => t.running || hasSimProgress(t));
+  const offline = troughs.filter((t) => !t.running && !hasSimProgress(t));
 
   return (
     <div className="space-y-3">

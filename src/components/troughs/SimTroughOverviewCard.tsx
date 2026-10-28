@@ -54,32 +54,40 @@ export function SimTroughOfflineRow({ troughState }: { troughState: SimTroughSta
 
 // ── Full running card ─────────────────────────────────────────────────────────
 export function SimTroughRunningCard({ troughState }: { troughState: SimTroughState }) {
-  const { data, idx, running } = troughState;
+  const { data, idx, running, livePoints } = troughState;
   const { session, events, timeSeries } = data;
+  const live = data.id === 't06';
+  const series = live ? livePoints : timeSeries;
+  const hasReading = live ? series.length > 0 : true;
 
-  const started = running || idx > 0;
-  const point = timeSeries[idx] ?? timeSeries[0];
+  const started = live ? hasReading : running || idx > 0;
+  const point = live ? series[series.length - 1] ?? null : timeSeries[idx] ?? timeSeries[0];
 
-  const ws    = point?.current_ws_pct ?? 100;
-  const weight = point?.weight_kg     ?? session.starting_weight_kg;
-  const temp   = point?.upper_temp_c  ?? point?.ambient_temp_c ?? null;
-  const rh     = point?.upper_rh_pct  ?? point?.ambient_rh_pct ?? null;
-  const fanHz  = point?.fan_speed_hz  ?? null;
+  const ws    = hasReading ? (point?.current_ws_pct ?? (live ? null : 100)) : null;
+  const weight = hasReading ? (point?.weight_kg ?? (live ? null : session.starting_weight_kg)) : null;
+  const temp   = hasReading ? (point?.upper_temp_c ?? point?.ambient_temp_c ?? null) : null;
+  const rh     = hasReading ? (point?.upper_rh_pct ?? point?.ambient_rh_pct ?? null) : null;
+  const fanHz  = hasReading ? (point?.fan_speed_hz ?? null) : null;
 
+  const originMs = live && series[0] ? Date.parse(series[0].timestamp) : Date.parse(session.session_start);
   const elapsedH = point?.timestamp
-    ? Math.round(((Date.parse(point.timestamp) - Date.parse(session.session_start)) / 3_600_000) * 10) / 10
+    ? Math.round(((Date.parse(point.timestamp) - originMs) / 3_600_000) * 10) / 10
     : 0;
   const totalH = Math.round(
     ((Date.parse(session.session_end) - Date.parse(session.session_start)) / 3_600_000) * 10,
   ) / 10;
 
-  const phase = started
-    ? getPhase(session, events, point?.timestamp ?? session.session_start)
+  const phase = !live && started && point
+    ? getPhase(session, events, point.timestamp ?? session.session_start)
     : null;
 
-  const progressPct = timeSeries.length > 1
-    ? Math.round((idx / (timeSeries.length - 1)) * 100)
-    : 0;
+  const progressPct = !hasReading || ws == null
+    ? 0
+    : live
+      ? Math.min(100, Math.round(((100 - ws) / Math.max(1, 100 - session.target_ws_pct)) * 100))
+      : timeSeries.length > 1
+        ? Math.round((idx / (timeSeries.length - 1)) * 100)
+        : 0;
 
   const accentColor = running ? '#22c55e' : '#f59e0b';
 
@@ -98,9 +106,16 @@ export function SimTroughRunningCard({ troughState }: { troughState: SimTroughSt
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-sm font-bold text-slate-100">Trough {session.trough_number}</p>
-          <p className="text-xs text-slate-400">{session.airflow_mode} · {elapsedH} / {totalH} h</p>
+          <p className="text-xs text-slate-400">
+            {live && !hasReading ? 'Waiting for live samples' : live ? `Live · ${elapsedH} h` : `${session.airflow_mode} · ${elapsedH} / ${totalH} h`}
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
+          {live && hasReading && running && (
+            <span className="rounded-md bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 text-[10px] font-bold text-green-400">
+              LIVE
+            </span>
+          )}
           {phase && (
             <span className="rounded-md bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-400">
               {phase}
@@ -128,7 +143,7 @@ export function SimTroughRunningCard({ troughState }: { troughState: SimTroughSt
         <Tile icon={Wind}        iconCls="text-green-500"  label="Fan"
           value={fanHz != null ? `${fmtNumber(fanHz, 0)} Hz` : '—'} />
         <Tile icon={null}        iconCls=""                label="WS now"
-          value={`${fmtNumber(ws, 1)} %`} />
+          value={ws != null ? `${fmtNumber(ws, 1)} %` : '—'} />
       </div>
 
       {/* Progress */}
@@ -148,7 +163,9 @@ export function SimTroughRunningCard({ troughState }: { troughState: SimTroughSt
           />
         </div>
         <p className="mt-1 text-[10px] text-slate-600">
-          {fmtNumber(weight, 0)} kg current · {fmtNumber(session.starting_weight_kg - weight, 0)} kg moisture lost
+          {weight != null
+            ? `${fmtNumber(weight, 0)} kg current · ${fmtNumber(session.starting_weight_kg - weight, 0)} kg moisture lost`
+            : 'No live sample yet'}
         </p>
       </div>
     </div>

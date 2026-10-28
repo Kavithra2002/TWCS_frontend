@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { api } from '@/lib/api';
+import { LIVE_TROUGH_ID, vboxRowsToPoints } from '@/lib/live-trough';
 import type { SimTroughData, SimPoint, SimSession, SimEvent } from '@/lib/sim-data';
 import {
   buildSimRunRecord,
@@ -17,7 +19,9 @@ import {
   loadSimRunHistory,
   saveSimRunHistory,
   type SimRunRecord,
+  type SimRunSnapshot,
 } from '@/lib/sim-run-history';
+import type { TestVersionStatus } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +31,10 @@ export interface SimTroughState {
   data: SimTroughData;
   idx: number;
   running: boolean;
+  /** Trough 6 only. Real VNet samples. Empty until the SSH feed sends a non-zero row. */
+  livePoints: SimPoint[];
+  liveError: string | null;
+  tunnel: 'idle' | 'connecting' | 'open' | 'error';
 }
 
 interface SimState {
@@ -42,7 +50,9 @@ type Action =
   | { type: 'STOP_ALL' }
   | { type: 'CLEAR'; id: string }
   | { type: 'SET_IDX'; id: string; idx: number }
-  | { type: 'TICK'; id: string };
+  | { type: 'TICK'; id: string }
+  | { type: 'TUNNEL'; id: string; tunnel: SimTroughState['tunnel']; liveError: string | null }
+  | { type: 'LIVE_POINTS'; id: string; points: SimPoint[] };
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +61,15 @@ function reducer(state: SimState, action: Action): SimState {
     case 'LOAD': {
       const troughs: Record<string, SimTroughState> = {};
       for (const d of action.troughs) {
-        troughs[d.id] = { data: d, idx: 0, running: false };
+        const data = d.id === LIVE_TROUGH_ID ? { ...d, events: [], timeSeries: [] } : d;
+        troughs[data.id] = {
+          data,
+          idx: 0,
+          running: false,
+          livePoints: [],
+          liveError: null,
+          tunnel: 'idle',
+        };
       }
       return { troughs, loaded: true };
     }
@@ -85,14 +103,52 @@ function reducer(state: SimState, action: Action): SimState {
       }
       return { ...state, troughs };
     }
-    case 'CLEAR':
+    case 'CLEAR': {
+      const current = state.troughs[action.id];
+      if (!current) return state;
       return {
         ...state,
         troughs: {
           ...state.troughs,
-          [action.id]: { ...state.troughs[action.id], idx: 0, running: false },
+          [action.id]: {
+            ...current,
+            idx: 0,
+            running: false,
+            livePoints: [],
+            liveError: null,
+            tunnel: 'idle',
+          },
         },
       };
+    }
+    case 'TUNNEL': {
+      const current = state.troughs[action.id];
+      if (!current) return state;
+      return {
+        ...state,
+        troughs: {
+          ...state.troughs,
+          [action.id]: { ...current, tunnel: action.tunnel, liveError: action.liveError },
+        },
+      };
+    }
+    case 'LIVE_POINTS': {
+      const current = state.troughs[action.id];
+      if (!current) return state;
+      const merged = new Map<string, SimPoint>();
+      for (const point of current.livePoints) merged.set(point.timestamp, point);
+      for (const point of action.points) merged.set(point.timestamp, point);
+      const livePoints = [...merged.values()]
+        .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+        .slice(-800);
+      return {
+        ...state,
+        troughs: {
+          ...state.troughs,
+          [action.id]: { ...current, livePoints },
+        },
+      };
+    }
     case 'SET_IDX':
       return {
         ...state,
@@ -103,7 +159,7 @@ function reducer(state: SimState, action: Action): SimState {
       };
     case 'TICK': {
       const t = state.troughs[action.id];
-      if (!t || !t.running) return state;
+      if (!t || !t.running || t.data.id === LIVE_TROUGH_ID) return state;
       const next = t.idx + 1;
       if (next >= t.data.timeSeries.length) {
         return {
@@ -200,7 +256,13 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
   const archive = useCallback(
     (sim: SimTroughState, status: 'COMPLETED' | 'ABORTED') => {
       const wall = wallStartRef.current[sim.data.id] ?? Date.now();
-      const record = buildSimRunRecord(sim, status, wall);
+      const snapshot: SimRunSnapshot = {
+        id: sim.data.id,
+        data: sim.data.id === LIVE_TROUGH_ID ? { ...sim.data, timeSeries: sim.livePoints } : sim.data,
+        idx: sim.data.id === LIVE_TROUGH_ID ? Math.max(0, sim.livePoints.length - 1) : sim.idx,
+        running: sim.running,
+      };
+      const record = buildSimRunRecord(snapshot, status, wall);
       persistArchive(record);
       delete wallStartRef.current[sim.data.id];
     },
@@ -220,7 +282,7 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     const timer = setInterval(() => {
       const s = stateRef.current;
       for (const [id, t] of Object.entries(s.troughs)) {
-        if (!t.running) continue;
+        if (!t.running || t.data.id === LIVE_TROUGH_ID) continue;
         const next = t.idx + 1;
         if (next >= t.data.timeSeries.length) {
           const finished: SimTroughState = {
@@ -254,20 +316,39 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const connectLiveTrough = useCallback(async (id: string) => {
+    try {
+      await api('/test-version/tunnel', { method: 'POST', live: true });
+      dispatch({ type: 'TUNNEL', id, tunnel: 'open', liveError: null });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not open the SSH tunnel';
+      dispatch({ type: 'TUNNEL', id, tunnel: 'error', liveError: message });
+    }
+  }, []);
+
   const play = useCallback(
     (id: string) => {
       markWallStart(id);
       dispatch({ type: 'PLAY', id });
+      if (id === LIVE_TROUGH_ID) {
+        dispatch({ type: 'TUNNEL', id, tunnel: 'connecting', liveError: null });
+        void connectLiveTrough(id);
+      }
     },
-    [markWallStart],
+    [markWallStart, connectLiveTrough],
   );
 
   const stop = useCallback((id: string) => dispatch({ type: 'STOP', id }), []);
 
   const playAll = useCallback(() => {
-    for (const id of Object.keys(stateRef.current.troughs)) markWallStart(id);
+    const ids = Object.keys(stateRef.current.troughs);
+    for (const id of ids) markWallStart(id);
     dispatch({ type: 'PLAY_ALL' });
-  }, [markWallStart]);
+    if (ids.includes(LIVE_TROUGH_ID)) {
+      dispatch({ type: 'TUNNEL', id: LIVE_TROUGH_ID, tunnel: 'connecting', liveError: null });
+      void connectLiveTrough(LIVE_TROUGH_ID);
+    }
+  }, [markWallStart, connectLiveTrough]);
 
   const stopAll = useCallback(() => dispatch({ type: 'STOP_ALL' }), []);
 
@@ -301,6 +382,38 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     (id: string) => wallStartRef.current[id],
     [],
   );
+
+  const liveRunning = state.troughs[LIVE_TROUGH_ID]?.running ?? false;
+  useEffect(() => {
+    if (!liveRunning) return;
+    let cancelled = false;
+
+    const pull = async () => {
+      try {
+        const status = await api<TestVersionStatus>('/test-version/status', { live: true });
+        if (cancelled) return;
+        dispatch({
+          type: 'LIVE_POINTS',
+          id: LIVE_TROUGH_ID,
+          points: vboxRowsToPoints(status.live?.rows ?? []),
+        });
+        if (status.live?.dbConnected) {
+          dispatch({ type: 'TUNNEL', id: LIVE_TROUGH_ID, tunnel: 'open', liveError: null });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : 'Live feed unavailable';
+        dispatch({ type: 'TUNNEL', id: LIVE_TROUGH_ID, tunnel: 'error', liveError: message });
+      }
+    };
+
+    void pull();
+    const timer = setInterval(() => void pull(), 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [liveRunning]);
 
   return (
     <SimulatorContext.Provider

@@ -77,10 +77,21 @@ export function loadAllSimData(): SimTroughData[] {
   const base = path.resolve(process.cwd(), '..', 'backend', 'moc_json');
   const results: SimTroughData[] = [];
 
-  // t01–t06: all trough sessions
+  // t01–t05 replay saved sessions. Trough 6 is the live SSH feed only.
   for (let i = 1; i <= 6; i++) {
     const id = `t0${i}`;
     const dir = path.join(base, id);
+    if (i === 6) {
+      const session = readJson(path.join(dir, 'session.json'));
+      if (!session) continue;
+      results.push({
+        id,
+        session: session as SimSession,
+        events: [],
+        timeSeries: [],
+      });
+      continue;
+    }
     const t = loadTrough(id, dir, 'session.json', 'event.json', 'time_series.json');
     if (t) results.push(t);
   }

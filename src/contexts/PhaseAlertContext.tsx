@@ -115,6 +115,7 @@ export function PhaseAlertProvider({ children }: { children: React.ReactNode }) 
     if (!state.loaded) return;
 
     for (const [id, t] of Object.entries(state.troughs)) {
+      if (t.data.id === 't06') continue;
       const started = t.running || t.idx > 0;
 
       if (!started) {

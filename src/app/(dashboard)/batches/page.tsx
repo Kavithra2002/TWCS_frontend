@@ -22,6 +22,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Segmented } from '@/components/ui/Segmented';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { getPhase, useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
+import { isLiveTroughId, isSimActive } from '@/lib/live-trough';
 import { qs } from '@/lib/api';
 import { fmtDateTime, fmtDuration, fmtNumber, troughPlantCode } from '@/lib/format';
 import { isSimSessionFinished, simRunToBatch } from '@/lib/sim-run-history';
@@ -82,9 +83,11 @@ function simToOngoingBatch(
   const session = sim.data.session;
   const n = session.trough_number;
   const code = troughPlantCode(n);
-  const point = sim.data.timeSeries[sim.idx] ?? sim.data.timeSeries[0];
-  const first = sim.data.timeSeries[0];
-  const startMs = Date.parse(session.session_start);
+  const live = isLiveTroughId(sim.data.id);
+  const series = live ? sim.livePoints : sim.data.timeSeries;
+  const point = live ? series[series.length - 1] : series[sim.idx] ?? series[0];
+  const first = series[0];
+  const startMs = live && first ? Date.parse(first.timestamp) : Date.parse(session.session_start);
   const atMs = point ? Date.parse(point.timestamp) : startMs;
   const elapsedMinutes = Math.max(0, Math.round((atMs - startMs) / 60_000));
   const initialMoisture = first?.current_ws_pct ?? 100;
@@ -94,11 +97,13 @@ function simToOngoingBatch(
   const progressPct =
     currentMoisture != null && span > 0
       ? clamp(((initialMoisture - currentMoisture) / span) * 100, 0, 100)
-      : sim.data.timeSeries.length > 1
+      : !live && sim.data.timeSeries.length > 1
         ? Math.round((sim.idx / (sim.data.timeSeries.length - 1)) * 100)
         : 0;
 
-  const phase = getPhase(session, sim.data.events, point?.timestamp ?? session.session_start);
+  const phase = live
+    ? (point ? 'LIVE' : 'WAITING')
+    : getPhase(session, sim.data.events, point?.timestamp ?? session.session_start);
   // Wall-clock start so newest live runs sort to the top (not simulated session age).
   const startedAt = new Date(wallStartedAt ?? Date.now()).toISOString();
 
@@ -178,7 +183,7 @@ export default function BatchesPage() {
   const liveOngoing = useMemo(() => {
     if (!simState.loaded || !range.includesToday) return [] as Batch[];
     return Object.values(simState.troughs)
-      .filter((t) => (t.running || t.idx > 0) && !isSimSessionFinished(t))
+      .filter((t) => isSimActive(t) && !isSimSessionFinished(t))
       .map((t) => {
         const code = troughPlantCode(t.data.session.trough_number);
         return simToOngoingBatch(t, troughByCode.get(code), getWallStartedAt(t.data.id));

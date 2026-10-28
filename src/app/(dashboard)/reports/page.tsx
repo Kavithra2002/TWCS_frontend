@@ -18,6 +18,7 @@ import {
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState, Loading } from '@/components/ui/States';
 import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
+import { isLiveTroughId, isSimActive } from '@/lib/live-trough';
 import { api, qs } from '@/lib/api';
 import { fmtDateTime, fmtNumber } from '@/lib/format';
 import { exportReportPdf } from '@/lib/report-pdf';
@@ -68,6 +69,22 @@ function simMetric(point: SimPoint, sensorType: SensorType): number | null {
 
 /** Points from a live/progressed sim run, clipped to the selected view window (hours). */
 function simSeriesPoints(t: SimTroughState, sensorType: SensorType, viewHours: number): SeriesPoint[] {
+  if (isLiveTroughId(t.data.id)) {
+    const series = t.livePoints;
+    if (!series.length) return [];
+    const startMs = Date.parse(series[0].timestamp);
+    const maxMs = viewHours * 3_600_000;
+    const out: SeriesPoint[] = [];
+    for (const p of series) {
+      const elapsed = Date.parse(p.timestamp) - startMs;
+      if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed > maxMs) continue;
+      const v = simMetric(p, sensorType);
+      if (v == null) continue;
+      out.push({ t: p.timestamp, avg: v, min: v, max: v });
+    }
+    return out;
+  }
+
   const progressEnd = Math.max(t.idx, t.running ? 1 : 0);
   if (progressEnd <= 0) return [];
 
@@ -114,7 +131,7 @@ function yDomainForSensor(sensorType: SensorType, sims: SimBind[]): [number, num
   let min = Infinity;
   let max = -Infinity;
   for (const { sim } of sims) {
-    const series = sim.data.timeSeries;
+    const series = isLiveTroughId(sim.data.id) ? sim.livePoints : sim.data.timeSeries;
     const step = Math.max(1, Math.floor(series.length / 200));
     for (let i = 0; i < series.length; i += step) {
       const v = simMetric(series[i], sensorType);
@@ -184,7 +201,7 @@ export default function ReportsPage() {
 
   /** Only troughs that have actually progressed in a run (today / live). */
   const activeSimRuns = useMemo(
-    () => selectedSims.filter(({ sim }) => sim.running || sim.idx > 0),
+    () => selectedSims.filter(({ sim }) => isSimActive(sim)),
     [selectedSims],
   );
 
@@ -596,7 +613,7 @@ export default function ReportsPage() {
               const hasSensor = t.sensors.some((s) => s.type === type);
               const simId = troughCodeToSimId(t.code);
               const sim = simId ? simState.troughs[simId] : undefined;
-              const running = !!sim && (sim.running || sim.idx > 0);
+              const running = !!sim && isSimActive(sim);
               return (
                 <button
                   key={t.id}

@@ -201,14 +201,6 @@ html.light .running-glow {
   will-change: width;
 }
 
-@keyframes live-row-arrive {
-  0% { transform: translateY(-14px); }
-  100% { transform: translateY(0); }
-}
-.live-row-arrive {
-  animation: live-row-arrive 0.55s ease-out;
-}
-
 /* ─── Recharts ───────────────────────────────────────────────────── */
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 .recharts-text { fill: #a1a1aa; font-size: 11px; }

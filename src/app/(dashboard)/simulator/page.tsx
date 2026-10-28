@@ -34,31 +34,54 @@ function SimCard({
   onToggle: (e: React.MouseEvent) => void;
   onClear: (e: React.MouseEvent) => void;
 }) {
-  const { data, idx, running } = t;
+  const { data, idx, running, livePoints, liveError, tunnel } = t;
   const { session, events, timeSeries } = data;
+  const live = data.id === 't06';
+  const series = live ? livePoints : timeSeries;
+  const point = live ? series[series.length - 1] ?? null : series[idx] ?? series[0];
+  const hasReading = live ? series.length > 0 : true;
+  const started = live ? hasReading : running || idx > 0;
 
-  const total = timeSeries.length;
-  const point = timeSeries[idx] ?? timeSeries[0];
-  const started = running || idx > 0;
+  const total = series.length;
+  const ws     = hasReading ? (point?.current_ws_pct ?? (live ? null : 100)) : null;
+  const weight = hasReading ? (point?.weight_kg ?? (live ? null : session.starting_weight_kg)) : null;
+  const temp   = hasReading ? (point?.upper_temp_c ?? point?.ambient_temp_c ?? null) : null;
+  const rh     = hasReading ? (point?.upper_rh_pct ?? point?.ambient_rh_pct ?? null) : null;
+  const fanHz  = hasReading ? (point?.fan_speed_hz ?? null) : null;
+  const energy = hasReading ? (point?.cumulative_energy_kwh ?? null) : null;
 
-  const ws     = point?.current_ws_pct ?? 100;
-  const weight = point?.weight_kg ?? session.starting_weight_kg;
-  const temp   = point?.upper_temp_c ?? point?.ambient_temp_c ?? null;
-  const rh     = point?.upper_rh_pct ?? point?.ambient_rh_pct ?? null;
-  const fanHz  = point?.fan_speed_hz ?? null;
-  const energy = point?.cumulative_energy_kwh ?? null;
-
-  const phase = started
+  const phase = !live && started
     ? (getPhase(session, events, point?.timestamp ?? session.session_start) as Phase)
     : null;
 
-  const progressPct = total > 1 ? (idx / (total - 1)) * 100 : 0;
-  const isDone = phase === 'DONE' && !running;
-  const color = started ? barColor(ws) : '#1e293b';
-
-  const elapsedH = point?.timestamp
-    ? Math.round(((Date.parse(point.timestamp) - Date.parse(session.session_start)) / 3_600_000) * 10) / 10
+  const witherPct = ws != null
+    ? Math.min(100, Math.max(0, ((100 - ws) / Math.max(1, 100 - session.target_ws_pct)) * 100))
     : 0;
+  const progressPct = !hasReading
+    ? 0
+    : live
+      ? witherPct
+      : total > 1 ? (idx / (total - 1)) * 100 : 0;
+  const isDone = phase === 'DONE' && !running;
+  const color = ws != null ? barColor(ws) : '#1e293b';
+
+  const originMs = live && series[0]
+    ? Date.parse(series[0].timestamp)
+    : Date.parse(session.session_start);
+  const elapsedH = point?.timestamp
+    ? Math.round(((Date.parse(point.timestamp) - originMs) / 3_600_000) * 10) / 10
+    : 0;
+  const statusText = live && tunnel === 'connecting'
+    ? 'Connecting'
+    : live && tunnel === 'error'
+      ? 'Tunnel'
+      : live && running && !hasReading
+        ? 'Waiting'
+        : live && running && hasReading
+          ? 'Live'
+          : live && hasReading
+            ? 'Paused'
+            : phase ?? 'Ready';
 
   return (
     <div
@@ -112,9 +135,9 @@ function SimCard({
           {/* Phase + Run/Stop button */}
           <div className="flex shrink-0 items-center gap-2">
             <span className={`text-[11px] font-bold ${
-              phase ? PHASE_COLOR[phase] : 'text-slate-600'
+              phase ? PHASE_COLOR[phase] : live && hasReading ? 'text-green-400' : 'text-slate-600'
             }`}>
-              {phase ?? 'Ready'} <span className="font-normal text-slate-600">| {session.airflow_mode}</span>
+              {statusText} <span className="font-normal text-slate-600">| {live ? 'LIVE' : session.airflow_mode}</span>
             </span>
 
             {isDone ? (
@@ -149,13 +172,25 @@ function SimCard({
           <div className="rounded-lg bg-slate-800/50 px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500">Wither Std</p>
             <p className="mt-0.5 text-base font-bold tabular-nums text-slate-100">
-              {fmtNumber(ws, 1)}<span className="ml-0.5 text-xs font-normal text-slate-500">%</span>
+              {ws != null ? (
+                <>
+                  {fmtNumber(ws, 1)}<span className="ml-0.5 text-xs font-normal text-slate-500">%</span>
+                </>
+              ) : (
+                <span className="text-slate-500">—</span>
+              )}
             </p>
           </div>
           <div className="rounded-lg bg-slate-800/50 px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500">Weight</p>
             <p className="mt-0.5 text-base font-bold tabular-nums text-slate-100">
-              {fmtNumber(weight, 0)}<span className="ml-0.5 text-xs font-normal text-slate-500">kg</span>
+              {weight != null ? (
+                <>
+                  {fmtNumber(weight, 0)}<span className="ml-0.5 text-xs font-normal text-slate-500">kg</span>
+                </>
+              ) : (
+                <span className="text-slate-500">—</span>
+              )}
             </p>
           </div>
         </div>
@@ -186,7 +221,17 @@ function SimCard({
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-[10px] text-slate-600">
             <span>{Math.round(progressPct)}% complete</span>
-            <span>{started ? `${elapsedH}h elapsed · step ${idx + 1}/${total}` : `${session.starting_weight_kg.toLocaleString()} kg start`}</span>
+            <span>
+              {live && !hasReading
+                ? running
+                  ? 'Waiting for live samples'
+                  : 'Live feed'
+                : started
+                  ? live
+                    ? `${elapsedH}h elapsed · ${total} live samples`
+                    : `${elapsedH}h elapsed · step ${idx + 1}/${total}`
+                  : `${session.starting_weight_kg.toLocaleString()} kg start`}
+            </span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
             <div
@@ -194,6 +239,9 @@ function SimCard({
               style={{ width: `${progressPct}%`, backgroundColor: color }}
             />
           </div>
+          {live && liveError && (
+            <p className="mt-2 text-[10px] leading-snug text-red-400">{liveError}</p>
+          )}
         </div>
       </div>
     </div>
