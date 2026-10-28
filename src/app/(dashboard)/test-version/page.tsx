@@ -1,7 +1,7 @@
 'use client';
 
 import { Activity, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { VnetLiveBoard } from '@/components/charts/VnetLiveBoard';
 import { Button } from '@/components/ui/Button';
@@ -65,13 +65,15 @@ const READINGS = [...PRIMARY, ...SECONDARY];
 export default function TestVersionPage() {
   const { data: status, error, mutate } = useSWR('test-version-status', loadStatus, {
     refreshInterval: 1500,
+    keepPreviousData: true,
   });
 
-  const connected = Boolean(status?.live?.dbConnected && status.live.feedConnected);
+  const linkUp = status?.live?.dbConnected === true;
+  const feedLive = Boolean(linkUp && status.live?.feedConnected);
   const dbDown = status?.live?.dbConnected === false;
 
   return (
-    <div>
+    <div className="[overflow-anchor:none]">
       <PageHeader
         title="Test Version"
         description="Live view of VNet samples in raw_vbox_data. Charts follow the same rows as the table."
@@ -93,31 +95,31 @@ export default function TestVersionPage() {
 
       <div
         className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-          connected
+          feedLive
             ? 'border-green-500/25 bg-green-500/10'
             : dbDown
               ? 'border-red-500/25 bg-red-500/10'
-              : 'border-amber-500/20 bg-amber-500/10'
+              : 'border-green-500/20 bg-green-500/10'
         }`}
       >
         <div className="flex items-center gap-3">
-          <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'animate-pulse bg-green-400' : dbDown ? 'bg-red-400' : 'bg-amber-400'}`} />
+          <span className={`h-2.5 w-2.5 rounded-full ${feedLive ? 'animate-pulse bg-green-400' : dbDown ? 'bg-red-400' : 'bg-green-400'}`} />
           <div>
             <p className="text-sm font-semibold text-slate-100">
-              {connected ? 'VNet feed live' : dbDown ? 'Database unreachable' : 'Waiting for samples'}
+              {dbDown ? 'Database unreachable' : feedLive ? 'VNet feed live' : 'Connected'}
             </p>
             <p className="text-[11px] text-slate-500">
               {dbDown
                 ? status?.live?.error ?? 'Open the SSH tunnel to read raw_vbox_data.'
-                : status?.live?.feedConnected
-                  ? `Last sample ${formatAge(status.live.ageMs)} · ${status.live.count.toLocaleString()} rows in the table`
+                : feedLive
+                  ? `Last sample ${formatAge(status.live?.ageMs)} · ${status.live?.count.toLocaleString()} rows in the table`
                   : status?.live?.lastReceivedAt
-                    ? `No sample for ${formatAge(status.live.ageMs)} · ${status.live.count.toLocaleString()} rows stored`
-                    : 'The charts fill as soon as the first row arrives.'}
+                    ? `Link is up · last sample ${formatAge(status.live.ageMs)} · ${status.live.count.toLocaleString()} rows stored`
+                    : 'Link is up. The charts fill as soon as the first row arrives.'}
             </p>
           </div>
         </div>
-        <StatusPill ok={connected} label={connected ? 'Connected' : 'Disconnected'} />
+        <StatusPill ok={linkUp} label={linkUp ? 'Connected' : 'Disconnected'} />
       </div>
 
       <VnetLiveBoard rows={status?.live?.rows ?? []} />
@@ -127,15 +129,28 @@ export default function TestVersionPage() {
 
 function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: string }) {
   const [view, setView] = useState<'samples' | 'table'>('samples');
-  const connected = Boolean(live?.dbConnected && live.feedConnected);
+  const linkUp = live?.dbConnected === true;
+  const feedLive = Boolean(linkUp && live?.feedConnected);
   const dbDown = live?.dbConnected === false;
   const age = formatAge(live?.ageMs);
   const newestId = live?.rows[0]?.id;
   const justArrivedId = useJustArrived(newestId);
   const flashKeys = useFieldFlash(live?.rows);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const seenNewest = useRef<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const scroller = historyRef.current;
+    if (!scroller || newestId == null) return;
+    const previous = seenNewest.current;
+    seenNewest.current = newestId;
+    if (previous == null || previous === newestId || scroller.scrollTop <= 0) return;
+    const added = scroller.firstElementChild;
+    if (added instanceof HTMLElement) scroller.scrollTop += added.offsetHeight + 8;
+  }, [newestId]);
 
   return (
-    <section className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/70">
+    <section className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/70 [overflow-anchor:none]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
@@ -152,15 +167,15 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <StatusPill ok={connected} label={connected ? 'Connected' : 'Disconnected'} />
+          <StatusPill ok={linkUp} label={linkUp ? 'Connected' : 'Disconnected'} />
           <span className="text-slate-500">
             {dbDown
               ? 'Database unreachable'
-              : live?.feedConnected
+              : feedLive
                 ? `Newest row ${age}`
                 : live?.lastReceivedAt
-                  ? `No new row for ${age}`
-                  : 'Waiting for the first row'}
+                  ? `Connected · last row ${age}`
+                  : 'Connected · waiting for the first row'}
           </span>
           <span className="text-slate-500">{live ? `${live.count.toLocaleString()} stored` : ''}</span>
         </div>
@@ -176,8 +191,8 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
       )}
 
       {!dbDown && live && !live.feedConnected && (
-        <div className="border-b border-amber-500/20 bg-amber-950/30 px-4 py-2 text-sm text-amber-100">
-          The database is reachable, but no new row has arrived in the last 25 seconds.
+        <div className="border-b border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-slate-200">
+          Connected to the droplet database. The newest stored row is older than 25 seconds, so this list is waiting for the next VNet sample.
         </div>
       )}
 
@@ -201,7 +216,7 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
                 flashKeys={flashKeys}
               />
               {live.rows.length > 1 && (
-                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                <div ref={historyRef} className="h-[420px] space-y-2 overflow-y-auto pr-1 [overflow-anchor:none]">
                   {live.rows.slice(1).map((row, index) => (
                     <SampleCard
                       key={row.id}
@@ -221,7 +236,7 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
 
       {view === 'samples' && !!live?.statusLog.length && (
         <div className="border-t border-slate-800 px-4 py-2 text-[11px] text-slate-500">
-          {live.statusLog[0].state === 'connected' ? 'Connected' : 'Disconnected'}
+          {linkUp ? (live?.feedConnected ? 'Samples arriving' : 'Link up') : 'Disconnected'}
           {' · '}
           {live.statusLog[0].reason}
           {' · '}
@@ -235,7 +250,7 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
 function RawTable({ live, justArrivedId }: { live?: RawLiveFeed; justArrivedId: number | null }) {
   return (
     <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
-      <div className="max-h-[420px] overflow-auto p-2">
+      <div className="h-[420px] overflow-auto p-2 [overflow-anchor:none]">
         {!live?.rows.length && (
           <p className="px-2 py-8 text-center text-sm text-slate-500">Waiting for raw_vbox_data rows.</p>
         )}
@@ -258,7 +273,7 @@ function RawTable({ live, justArrivedId }: { live?: RawLiveFeed; justArrivedId: 
                   key={row.id}
                   className={`border-t border-slate-800/80 ${
                     index === 0 ? 'bg-tea-500/10 text-slate-100' : 'hover:bg-slate-800/40'
-                  } ${justArrivedId === row.id ? 'live-row-arrive' : ''}`}
+                  }`}
                 >
                   <td className="whitespace-nowrap px-2 py-1.5 font-mono">{cellValue(row.receivedAt, 'inserted_at')}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 font-mono text-sky-400">{row.id}</td>
@@ -311,7 +326,7 @@ function SampleCard({
     <article
       className={`rounded-xl border px-3 py-3 ${
         isLatest ? 'border-tea-500/40 bg-tea-500/10' : 'border-slate-800 bg-slate-950/30'
-      } ${justArrived ? 'live-row-arrive' : ''}`}
+      }`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
