@@ -2,7 +2,7 @@
 
 import { Droplets, Leaf, Scale, Thermometer, Wind, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -81,7 +81,7 @@ function toPoints(rows: RawVboxRow[]): Point[] {
     for (const key of FIELDS) values[key] = num(row.payload[key]);
     // Recharts uses the x value as a tick key. Rows often share a timestamp, so nudge
     // collisions by 1ms. Order stays the same and the clock label does not change.
-    let ts = parseTs(row.payload.timestamp, row.receivedAt);
+    let ts = parseTs(row.receivedAt, String(row.payload.timestamp ?? ''));
     if (ts <= lastTs) ts = lastTs + 1;
     lastTs = ts;
     return { ts, values };
@@ -118,7 +118,32 @@ function previous(points: Point[], key: Field): number | null {
 }
 
 function history(points: Point[], key: Field): number[] {
-  return points.map((point) => point.values[key]).filter((value): value is number => value != null);
+  return points
+    .filter((point) => !isBlankPoint(point))
+    .map((point) => point.values[key])
+    .filter((value): value is number => value != null);
+}
+
+interface ChartRow {
+  ts: number;
+  [key: string]: number | null;
+}
+
+/** Real samples only, then hold the last reading up to the current clock. */
+function liveSeries(points: Point[], now: number): ChartRow[] {
+  let lastTs = Number.NEGATIVE_INFINITY;
+  const rows: ChartRow[] = [];
+  for (const point of points) {
+    if (isBlankPoint(point)) continue;
+    let ts = point.ts;
+    if (ts <= lastTs) ts = lastTs + 1;
+    lastTs = ts;
+    rows.push({ ts, ...point.values });
+  }
+  if (!rows.length) return [];
+  const end = Math.max(now, lastTs + 1);
+  rows.push({ ...rows[rows.length - 1], ts: end });
+  return rows;
 }
 
 function deltaHint(curr: number | null, prev: number | null, decimals: number, unit: string): string | undefined {
@@ -172,9 +197,10 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   const min = Math.min(...data);
   const max = Math.max(...data);
   const span = max - min || 1;
+  const flat = max === min;
   const coords = data.map((value, index) => ({
     x: (index / (data.length - 1)) * width,
-    y: height - 3 - ((value - min) / span) * (height - 6),
+    y: flat ? height / 2 : height - 3 - ((value - min) / span) * (height - 6),
   }));
   const line = coords.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
   const fill = [...coords.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`), `${width},${height}`, `0,${height}`].join(' ');
@@ -250,23 +276,17 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-function timeLabel(rows: { ts: number }[], index: unknown) {
-  const row = rows[Number(index)];
-  return row ? fmtTimeSec(row.ts) : '';
-}
-
-/** Index axis. A time scale repeats tick keys when two samples share a timestamp. */
-function TimeXAxis({ rows, minTickGap = 28 }: { rows: { ts: number }[]; minTickGap?: number }) {
+function timeAxis() {
   return (
     <XAxis
-      dataKey="i"
-      type="category"
-      allowDuplicatedCategory={false}
-      tickFormatter={(value) => timeLabel(rows, value)}
+      dataKey="ts"
+      type="number"
+      scale="time"
+      domain={['dataMin', 'dataMax']}
+      tickFormatter={(value) => fmtTimeSec(Number(value))}
       tickLine={false}
       axisLine={false}
-      minTickGap={minTickGap}
-      interval="preserveStartEnd"
+      minTickGap={40}
     />
   );
 }
@@ -356,17 +376,19 @@ function Meter({ label, width, color, text }: { label: string; width: number; co
   );
 }
 
-export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
+function sameRows(prev: RawVboxRow[], next: RawVboxRow[]) {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i += 1) if (prev[i].id !== next[i].id) return false;
+  return true;
+}
+
+function VnetLiveBoardInner({ rows }: { rows: RawVboxRow[] }) {
   const points = useMemo(() => toPoints(rows), [rows]);
-  const chartRows = useMemo(
-    () =>
-      points.map((point, index) => ({
-        i: index,
-        ts: point.ts,
-        ...point.values,
-      })),
-    [points],
-  );
+  const chartRows = useMemo(() => liveSeries(points, Date.now()), [points]);
+  const domain = useMemo<[number, number]>(() => {
+    if (!chartRows.length) return [Date.now() - 60_000, Date.now()];
+    return [chartRows[0].ts, chartRows[chartRows.length - 1].ts];
+  }, [chartRows]);
 
   if (!points.length) {
     return (
@@ -387,12 +409,12 @@ export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
   const rhLayers = activeLayers(RH_LAYERS, points);
   const quietTemp = TEMP_LAYERS.filter((layer) => !tempLayers.includes(layer)).map((layer) => layer.name);
   const quietRh = RH_LAYERS.filter((layer) => !rhLayers.includes(layer)).map((layer) => layer.name);
-  const from = fmtTimeSec(points[0].ts);
-  const to = fmtTimeSec(points[points.length - 1].ts);
-  const span = `${points.length} samples · ${from} – ${to}`;
+  const from = fmtTimeSec(domain[0]);
+  const to = fmtTimeSec(domain[1]);
+  const span = chartRows.length ? `Live · ${from} – ${to}` : `${points.length} samples`;
 
   return (
-    <div className="mb-4 space-y-4">
+    <div className="mb-4 space-y-4 [overflow-anchor:none]">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi
           label="Wither std"
@@ -462,20 +484,20 @@ export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <TimeXAxis rows={chartRows} minTickGap={36} />
-              <YAxis tickLine={false} axisLine={false} width={52} domain={paddedDomain(points.map((point) => point.values.weight_kg))} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => timeLabel(chartRows, value)} formatter={(value: number) => [`${fmtNumber(value, 1)} kg`, 'Weight']} />
-              <Area dataKey="weight_kg" name="Weight" stroke="#2e9862" fill="url(#vnet-weight)" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+              {timeAxis()}
+              <YAxis tickLine={false} axisLine={false} width={52} domain={paddedDomain(chartRows.map((row) => row.weight_kg))} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => fmtTimeSec(Number(value))} formatter={(value: number) => [`${fmtNumber(value, 1)} kg`, 'Weight']} />
+              <Area type="stepAfter" dataKey="weight_kg" name="Weight" stroke="#2e9862" fill="url(#vnet-weight)" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
           <p className="mb-1 mt-3 px-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Wither standard · %</p>
           <ResponsiveContainer width="100%" height={140}>
             <ComposedChart data={chartRows} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <TimeXAxis rows={chartRows} minTickGap={36} />
-              <YAxis tickLine={false} axisLine={false} width={52} domain={paddedDomain(points.map((point) => point.values.current_ws_pct))} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => timeLabel(chartRows, value)} formatter={(value: number) => [`${fmtNumber(value, 2)} %`, 'Wither std']} />
-              <Line dataKey="current_ws_pct" name="Wither std" stroke="#eab308" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+              {timeAxis()}
+              <YAxis tickLine={false} axisLine={false} width={52} domain={paddedDomain(chartRows.map((row) => row.current_ws_pct))} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => fmtTimeSec(Number(value))} formatter={(value: number) => [`${fmtNumber(value, 2)} %`, 'Wither std']} />
+              <Line type="stepAfter" dataKey="current_ws_pct" name="Wither std" stroke="#eab308" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </Panel>
@@ -498,12 +520,12 @@ export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={chartRows} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <TimeXAxis rows={chartRows} />
-              <YAxis tickLine={false} axisLine={false} width={44} domain={paddedDomain(tempLayers.flatMap((layer) => points.map((point) => point.values[layer.key])))} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => timeLabel(chartRows, value)} formatter={(value: number, name) => [`${fmtNumber(value, 1)} °C`, name]} />
+              {timeAxis()}
+              <YAxis tickLine={false} axisLine={false} width={44} domain={paddedDomain(tempLayers.flatMap((layer) => chartRows.map((row) => row[layer.key])))} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => fmtTimeSec(Number(value))} formatter={(value: number, name) => [`${fmtNumber(value, 1)} °C`, name]} />
               <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 12 }} />
               {tempLayers.map((layer) => (
-                <Line key={layer.key} dataKey={layer.key} name={layer.name} stroke={layer.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                <Line key={layer.key} type="stepAfter" dataKey={layer.key} name={layer.name} stroke={layer.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
               ))}
             </ComposedChart>
           </ResponsiveContainer>
@@ -515,12 +537,12 @@ export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={chartRows} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <TimeXAxis rows={chartRows} />
-              <YAxis tickLine={false} axisLine={false} width={44} domain={paddedDomain(rhLayers.flatMap((layer) => points.map((point) => point.values[layer.key])))} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => timeLabel(chartRows, value)} formatter={(value: number, name) => [`${fmtNumber(value, 1)} %`, name]} />
+              {timeAxis()}
+              <YAxis tickLine={false} axisLine={false} width={44} domain={paddedDomain(rhLayers.flatMap((layer) => chartRows.map((row) => row[layer.key])))} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(value) => fmtTimeSec(Number(value))} formatter={(value: number, name) => [`${fmtNumber(value, 1)} %`, name]} />
               <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 12 }} />
               {rhLayers.map((layer) => (
-                <Line key={layer.key} dataKey={layer.key} name={layer.name} stroke={layer.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                <Line key={layer.key} type="stepAfter" dataKey={layer.key} name={layer.name} stroke={layer.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
               ))}
             </ComposedChart>
           </ResponsiveContainer>
@@ -568,22 +590,24 @@ export function VnetLiveBoard({ rows }: { rows: RawVboxRow[] }) {
         <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={chartRows} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <TimeXAxis rows={chartRows} />
-            <YAxis yAxisId="fan" tickLine={false} axisLine={false} width={44} domain={['auto', 'auto']} />
-            <YAxis yAxisId="pa" orientation="right" tickLine={false} axisLine={false} width={44} domain={['auto', 'auto']} />
+            {timeAxis()}
+            <YAxis yAxisId="fan" tickLine={false} axisLine={false} width={44} domain={paddedDomain(chartRows.map((row) => row.fan_speed_hz))} />
+            <YAxis yAxisId="pa" orientation="right" tickLine={false} axisLine={false} width={44} domain={paddedDomain(chartRows.map((row) => row.chamber_pressure_pa))} />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelFormatter={(value) => timeLabel(chartRows, value)}
+              labelFormatter={(value) => fmtTimeSec(Number(value))}
               formatter={(value: number, name) => [fmtNumber(value, 1), name]}
             />
             <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 12 }} />
-            <Line yAxisId="fan" dataKey="fan_speed_hz" name="Fan Hz" stroke="#4ade80" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-            <Line yAxisId="pa" dataKey="chamber_pressure_pa" name="Chamber Pa" stroke="#a78bfa" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-            <Line yAxisId="fan" dataKey="hot_louver_position_pct" name="Hot louver %" stroke="#f97316" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
-            <Line yAxisId="fan" dataKey="amb_louver_position_pct" name="Amb louver %" stroke="#22d3ee" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+            <Line yAxisId="fan" type="stepAfter" dataKey="fan_speed_hz" name="Fan Hz" stroke="#4ade80" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+            <Line yAxisId="pa" type="stepAfter" dataKey="chamber_pressure_pa" name="Chamber Pa" stroke="#a78bfa" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+            <Line yAxisId="fan" type="stepAfter" dataKey="hot_louver_position_pct" name="Hot louver %" stroke="#f97316" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+            <Line yAxisId="fan" type="stepAfter" dataKey="amb_louver_position_pct" name="Amb louver %" stroke="#22d3ee" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </Panel>
     </div>
   );
 }
+
+export const VnetLiveBoard = memo(VnetLiveBoardInner, (prev, next) => sameRows(prev.rows, next.rows));
