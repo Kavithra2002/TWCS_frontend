@@ -29,6 +29,8 @@ const routes = [
   '/',
   '/dashboard-2',
   '/simulator',
+  '/test-version',
+  '/test-version-2',
   '/troughs',
   '/troughs/trough-01',
   '/batches',
