@@ -11,54 +11,35 @@ import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState, ErrorState, Loading } from '@/components/ui/States';
 import { SimTroughOfflineRow, SimTroughRunningCard } from '@/components/troughs/SimTroughOverviewCard';
-import { useSimulator, type SimTroughState } from '@/contexts/SimulatorContext';
+import type { SimTroughState } from '@/contexts/SimulatorContext';
 import { hasSimProgress } from '@/lib/live-trough';
-import { isOverviewOnlyRole, overviewTitleForRole, roleLabel } from '@/lib/auth';
+import { canAccessPath, isGeneralManager, overviewTitleForRole } from '@/lib/auth';
 import { fmtNumber } from '@/lib/format';
+import { troughNumberFromCode, useVisibleSimTroughs } from '@/hooks/useTroughAccess';
 import { SCHEDULE_ACTION_STYLE, SENSOR_META, TROUGH_STATUS_STYLE } from '@/lib/sensors';
 import type { DashboardOverview, TodaySchedules } from '@/types';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-
-  if (isOverviewOnlyRole(user)) {
-    return <RoleOverviewView role={user!.role} />;
-  }
-
-  return <SuperAdminOverview />;
-}
-
-/** Placeholder landing page for Executive / Operation / Engineering. */
-function RoleOverviewView({ role }: { role: string }) {
-  return (
-    <>
-      <PageHeader
-        title={overviewTitleForRole(role)}
-        description={`${roleLabel(role)} workspace — more tools will appear here soon.`}
-      />
-      <Card>
-        <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
-          <p className="text-2xl font-semibold tracking-tight text-[#111827]">{overviewTitleForRole(role)}</p>
-          <p className="mt-2 max-w-md text-sm text-[#111827]/65">
-            You are signed in as {roleLabel(role)}. Only Overview is available for this role right now.
-          </p>
-        </div>
-      </Card>
-    </>
-  );
-}
-
-function SuperAdminOverview() {
   const { data, error } = useSWR<DashboardOverview>('/dashboard/overview', { refreshInterval: 30_000 });
-  const { state: simState } = useSimulator();
+  const {
+    troughs: simTroughs,
+    allowed,
+    ready,
+    error: troughError,
+    restricted,
+  } = useVisibleSimTroughs();
 
-  if (error) return <ErrorState error={error} />;
-  if (!data) return <Loading label="Loading dashboard…" />;
+  if (error || troughError) return <ErrorState error={error ?? troughError} />;
+  if (!data || !ready) return <Loading label="Loading dashboard…" />;
 
   const { kpis } = data;
   const avg = kpis.averages;
-
-  const simTroughs = Object.values(simState.troughs);
+  const gm = isGeneralManager(user);
+  const title = user?.role === 'executive' ? overviewTitleForRole(user.role) : 'Overview';
+  const description = gm
+    ? 'Live withering on the troughs assigned to you'
+    : 'Live withering conditions across all troughs';
   const simRunning = simTroughs.filter((t) => t.running).length;
   const simPaused  = simTroughs.filter((t) => !t.running && hasSimProgress(t)).length;
   const simReady   = simTroughs.filter((t) => !t.running && !hasSimProgress(t)).length;
@@ -66,7 +47,7 @@ function SuperAdminOverview() {
 
   return (
     <>
-      <PageHeader title="Overview" description="Live withering conditions across all troughs · Super admin" />
+      <PageHeader title={title} description={description} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Running troughs" value={`${simRunning}/${simTotal}`} icon={Layers} hint={`${simPaused} paused · ${simReady} ready`} />
@@ -74,7 +55,18 @@ function SuperAdminOverview() {
         <KpiCard label="Avg humidity" value={fmtNumber(avg.humidity)} unit="%RH" icon={Droplets} color={SENSOR_META.HUMIDITY.color} />
         <KpiCard label="Avg leaf moisture" value={fmtNumber(avg.leafMoisture)} unit="%" icon={Leaf} color={SENSOR_META.LEAF_MOISTURE.color} />
         <KpiCard label="Active batches" value={kpis.activeBatches} icon={Scale} color="#a78bfa" hint={`${fmtNumber(kpis.leafInProcessKg, 0)} kg green leaf`} />
-        <KpiCard label="Open alerts" value={kpis.openAlerts} icon={Bell} color="#ef4444" alert={kpis.openAlerts > 0} hint={<Link href="/alerts" className="hover:text-slate-300">View all →</Link>} />
+        <KpiCard
+          label="Open alerts"
+          value={kpis.openAlerts}
+          icon={Bell}
+          color="#ef4444"
+          alert={kpis.openAlerts > 0}
+          hint={
+            canAccessPath(user, '/alerts') ? (
+              <Link href="/alerts" className="hover:text-slate-300">View all →</Link>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* 3-column grid: left 2 cols stacked, right col alongside */}
@@ -84,16 +76,12 @@ function SuperAdminOverview() {
           <Card
             title="Withering troughs"
             subtitle={
-              simState.loaded
-                ? `${simTotal} troughs · ${simRunning} running`
-                : 'Loading simulator data…'
+              gm
+                ? `${simTotal} assigned trough${simTotal === 1 ? '' : 's'} · ${simRunning} running`
+                : `${simTotal} troughs · ${simRunning} running`
             }
           >
-            {!simState.loaded ? (
-              <Loading />
-            ) : (
-              <TroughList troughs={simTroughs} />
-            )}
+            <TroughList troughs={simTroughs} emptyLabel={restricted ? 'No troughs assigned yet' : 'No trough data available'} />
           </Card>
           <SriLankaMap />
         </div>
@@ -120,7 +108,7 @@ function SuperAdminOverview() {
               }
             />
           </Card>
-          <TodaySchedule />
+          <TodaySchedule allowed={allowed} />
         </div>
       </div>
     </>
@@ -128,7 +116,7 @@ function SuperAdminOverview() {
 }
 
 // ── Trough list: running = full cards, offline = compact rows ─────────────────
-function TroughList({ troughs }: { troughs: SimTroughState[] }) {
+function TroughList({ troughs, emptyLabel }: { troughs: SimTroughState[]; emptyLabel: string }) {
   const active  = troughs.filter((t) => t.running || hasSimProgress(t));
   const offline = troughs.filter((t) => !t.running && !hasSimProgress(t));
 
@@ -159,15 +147,20 @@ function TroughList({ troughs }: { troughs: SimTroughState[] }) {
 
       {/* Empty state */}
       {active.length === 0 && offline.length === 0 && (
-        <p className="py-6 text-center text-sm text-slate-600">No trough data available</p>
+        <p className="py-6 text-center text-sm text-slate-600">{emptyLabel}</p>
       )}
     </div>
   );
 }
 
-function TodaySchedule() {
+function TodaySchedule({ allowed }: { allowed: Set<number> | null }) {
+  const { user } = useAuth();
   const { data } = useSWR<TodaySchedules>('/schedules/today', { refreshInterval: 60_000 });
-  const items = data?.items ?? [];
+  const items = (data?.items ?? []).filter((item) => {
+    if (!allowed) return true;
+    const number = troughNumberFromCode(item.troughCode);
+    return number != null && allowed.has(number);
+  });
   const STATE = {
     ACTIVE: 'text-emerald-300',
     UPCOMING: 'text-sky-300',
@@ -178,7 +171,11 @@ function TodaySchedule() {
     <Card
       title="Today's schedule"
       subtitle={data ? `Factory time ${data.now} (${data.timeZone})` : undefined}
-      action={<Link href="/schedules" className="text-xs text-tea-400 hover:text-tea-300">Manage</Link>}
+      action={
+        canAccessPath(user, '/schedules') ? (
+          <Link href="/schedules" className="text-xs text-tea-400 hover:text-tea-300">Manage</Link>
+        ) : undefined
+      }
       bodyClassName="overflow-y-auto max-h-[464px]"
     >
       {!data ? (
