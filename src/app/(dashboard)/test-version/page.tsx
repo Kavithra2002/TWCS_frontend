@@ -7,7 +7,7 @@ import { VnetLiveBoard } from '@/components/charts/VnetLiveBoard';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Segmented } from '@/components/ui/Segmented';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import type { RawLiveFeed, RawVboxRow, TestVersionStatus } from '@/types';
 
 const loadStatus = () => api<TestVersionStatus>('/test-version/status', { live: true });
@@ -68,20 +68,49 @@ export default function TestVersionPage() {
     keepPreviousData: true,
   });
 
-  const linkUp = status?.live?.dbConnected === true;
-  const feedLive = Boolean(linkUp && status.live?.feedConnected);
-  const dbDown = status?.live?.dbConnected === false;
+  const watching = status?.live?.watching === true;
+  const receiving = Boolean(watching && status?.live?.feedConnected);
+  const stalled = Boolean(watching && status?.live?.dbConnected && !status.live?.feedConnected);
+  const dbDown = Boolean(watching && status?.live?.dbConnected === false);
+  const [checking, setChecking] = useState(false);
+  const [refreshNote, setRefreshNote] = useState('');
+
+  async function refreshLive() {
+    setChecking(true);
+    setRefreshNote('');
+    const previousId = status?.live?.rows[0]?.id;
+    try {
+      const next = await api<TestVersionStatus>('/test-version/refresh-db', { method: 'POST', live: true });
+      await mutate(next, { revalidate: false });
+      const newest = next.live?.rows[0];
+      const when = formatAge(next.live?.ageMs);
+      if (!newest) {
+        setRefreshNote('No rows stored yet.');
+      } else if (previousId != null && newest.id === previousId) {
+        setRefreshNote(`No newer row. Last sample ${when}.`);
+      } else {
+        setRefreshNote(`New sample ${when}.`);
+      }
+    } catch (err) {
+      setRefreshNote(err instanceof ApiError ? err.message : 'Could not check the database');
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <div className="[overflow-anchor:none]">
       <PageHeader
         title="Test Version"
-        description="Live view of VNet samples in raw_vbox_data. Charts follow the same rows as the table."
+        description="Live view of VNet samples. Connected only while Trough 6 is running and a new row is arriving."
         actions={
-          <Button variant="secondary" onClick={() => mutate()}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {refreshNote && <span className="text-xs text-slate-400">{refreshNote}</span>}
+            <Button variant="secondary" onClick={() => void refreshLive()} disabled={checking}>
+              <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin' : ''}`} />
+              {checking ? 'Checking…' : 'Refresh'}
+            </Button>
+          </div>
         }
       />
 
@@ -95,47 +124,42 @@ export default function TestVersionPage() {
 
       <div
         className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-          feedLive
+          receiving
             ? 'border-green-500/25 bg-green-500/10'
-            : dbDown
-              ? 'border-red-500/25 bg-red-500/10'
-              : 'border-green-500/20 bg-green-500/10'
+            : stalled || dbDown
+              ? 'border-amber-500/30 bg-amber-500/10'
+              : 'border-slate-700 bg-slate-900/50'
         }`}
       >
         <div className="flex items-center gap-3">
-          <span className={`h-2.5 w-2.5 rounded-full ${feedLive ? 'animate-pulse bg-green-400' : dbDown ? 'bg-red-400' : 'bg-green-400'}`} />
+          <span className={`h-2.5 w-2.5 rounded-full ${receiving ? 'animate-pulse bg-green-400' : 'bg-red-400'}`} />
           <div>
             <p className="text-sm font-semibold text-slate-100">
-              {dbDown ? 'Database unreachable' : feedLive ? 'VNet feed live' : 'Connected'}
+              {receiving ? 'Connected' : 'Disconnected'}
             </p>
             <p className="text-[11px] text-slate-500">
-              {dbDown
-                ? status?.live?.error ?? 'Open the SSH tunnel to read raw_vbox_data.'
-                : feedLive
-                  ? `Last sample ${formatAge(status.live?.ageMs)} · ${status.live?.count.toLocaleString()} rows in the table`
-                  : status?.live?.lastReceivedAt
-                    ? `Link is up · last sample ${formatAge(status.live.ageMs)} · ${status.live.count.toLocaleString()} rows stored`
-                    : 'Link is up. The charts fill as soon as the first row arrives.'}
+              {feedDetail(status?.live)}
             </p>
           </div>
         </div>
-        <StatusPill ok={linkUp} label={linkUp ? 'Connected' : 'Disconnected'} />
+        <StatusPill ok={receiving} label={receiving ? 'Connected' : 'Disconnected'} />
       </div>
 
-      <VnetLiveBoard rows={status?.live?.rows ?? []} />
+      <VnetLiveBoard rows={receiving ? status?.live?.rows ?? [] : status?.live?.rows ?? []} />
     </div>
   );
 }
 
 function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: string }) {
   const [view, setView] = useState<'samples' | 'table'>('samples');
-  const linkUp = live?.dbConnected === true;
-  const feedLive = Boolean(linkUp && live?.feedConnected);
-  const dbDown = live?.dbConnected === false;
+  const watching = live?.watching === true;
+  const receiving = Boolean(watching && live?.feedConnected);
+  const stalled = Boolean(watching && live?.dbConnected && !live.feedConnected);
+  const dbDown = Boolean(watching && live?.dbConnected === false);
   const age = formatAge(live?.ageMs);
-  const newestId = live?.rows[0]?.id;
+  const newestId = receiving ? live?.rows[0]?.id : undefined;
   const justArrivedId = useJustArrived(newestId);
-  const flashKeys = useFieldFlash(live?.rows);
+  const flashKeys = useFieldFlash(receiving ? live?.rows : undefined);
   const historyRef = useRef<HTMLDivElement>(null);
   const seenNewest = useRef<number | undefined>(undefined);
 
@@ -167,32 +191,30 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <StatusPill ok={linkUp} label={linkUp ? 'Connected' : 'Disconnected'} />
-          <span className="text-slate-500">
-            {dbDown
-              ? 'Database unreachable'
-              : feedLive
-                ? `Newest row ${age}`
-                : live?.lastReceivedAt
-                  ? `Connected · last row ${age}`
-                  : 'Connected · waiting for the first row'}
-          </span>
+          <StatusPill ok={receiving} label={receiving ? 'Connected' : 'Disconnected'} />
+          <span className="text-slate-500">{feedDetail(live, age)}</span>
           <span className="text-slate-500">{live ? `${live.count.toLocaleString()} stored` : ''}</span>
         </div>
       </div>
 
       {dbDown && (
         <div className="border-b border-red-500/20 bg-red-950/30 px-4 py-2 text-sm text-red-100">
-          Disconnected — {live?.error ?? 'open the SSH tunnel so this page can read the droplet database.'}
+          Disconnected — the SSH tunnel is not open, so live rows cannot be read.
           <code className="mt-1 block rounded bg-black/30 px-2 py-1 font-mono text-xs text-red-50">
             {tunnelHint ?? 'ssh -L 15432:127.0.0.1:5432 root@168.144.35.189'}
           </code>
         </div>
       )}
 
-      {!dbDown && live && !live.feedConnected && (
-        <div className="border-b border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-slate-200">
-          Connected to the droplet database. The newest stored row is older than 25 seconds, so this list is waiting for the next VNet sample.
+      {stalled && (
+        <div className="border-b border-amber-500/30 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
+          Disconnected — data is not being received. Trough 6 is running, but no new VNet sample has arrived in the last 25 seconds. The box on the client side may be switched off.
+        </div>
+      )}
+
+      {!watching && (
+        <div className="border-b border-slate-700 bg-slate-900/60 px-4 py-2 text-sm text-slate-300">
+          Disconnected — press Run on Trough 6 to open the live feed. Stop closes it again.
         </div>
       )}
 
@@ -236,7 +258,7 @@ function LiveFeed({ live, tunnelHint }: { live?: RawLiveFeed; tunnelHint?: strin
 
       {view === 'samples' && !!live?.statusLog.length && (
         <div className="border-t border-slate-800 px-4 py-2 text-[11px] text-slate-500">
-          {linkUp ? (live?.feedConnected ? 'Samples arriving' : 'Link up') : 'Disconnected'}
+          {receiving ? 'Samples arriving' : stalled ? 'Data is not being received' : 'Disconnected'}
           {' · '}
           {live.statusLog[0].reason}
           {' · '}
@@ -468,6 +490,13 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
       {label}
     </span>
   );
+}
+
+function feedDetail(live?: RawLiveFeed, age?: string) {
+  if (!live?.watching) return 'Trough 6 is stopped. Press Run to open the feed, and Stop to close it.';
+  if (!live.dbConnected) return live.error ?? 'The SSH tunnel is not open.';
+  if (!live.feedConnected) return 'Data is not being received. The VNet box may be off.';
+  return `Last sample ${age ?? formatAge(live.ageMs)} · ${live.count.toLocaleString()} rows`;
 }
 
 function formatAge(ageMs: number | null | undefined) {
