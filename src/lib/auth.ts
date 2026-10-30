@@ -29,6 +29,12 @@ export function setSession(token: string, user: User) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+/** Keep the signed-in profile in sync after that account is edited. */
+export function replaceStoredUser(user: User) {
+  if (!isBrowser()) return;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function clearSession() {
   if (!isBrowser()) return;
   localStorage.removeItem(TOKEN_KEY);
@@ -72,21 +78,53 @@ export const isSuperAdmin = (user: User | null | undefined) => user?.role === 's
 export const isAssignableRole = (role: string): role is AssignableRole =>
   ASSIGNABLE_ROLES.some((item) => item.value === role);
 
-/** Factory roles that currently only see Overview. */
-export const isOverviewOnlyRole = (user: User | null | undefined) =>
-  !!user && isAssignableRole(user.role);
-
 export const overviewTitleForRole = (role: string) =>
   isAssignableRole(role) ? ROLE_OVERVIEW_TITLE[role] : 'Overview';
 
 export const canManageUsers = (user: User | null | undefined) => isSuperAdmin(user);
 
-/** Paths a signed-in user may open. Overview-only roles are locked to `/`. */
+/**
+ * Pages each role may open. Super admin is unrestricted.
+ * Executive designations share the same pages; trough scope is separate.
+ */
+const ROLE_PATHS: Record<string, readonly string[]> = {
+  executive: ['/', '/dashboard-2'],
+  operation: [
+    '/dashboard-2',
+    '/simulator',
+    '/test-version',
+    '/test-version-2',
+    '/troughs',
+    '/batches',
+    '/schedules',
+    '/reports',
+    '/settings',
+  ],
+  engineering: ['/troughs', '/batches', '/reports', '/settings'],
+};
+
+const pathAllowed = (pathname: string, allowed: string) =>
+  allowed === '/' ? pathname === '/' : pathname === allowed || pathname.startsWith(`${allowed}/`);
+
+/** First page this account should land on after sign-in. */
+export function homePathFor(user: User | null | undefined): string {
+  if (!user) return '/login';
+  if (isSuperAdmin(user)) return '/';
+  return ROLE_PATHS[user.role]?.[0] ?? '/login';
+}
+
+/** Paths a signed-in user may open. Unknown roles are denied. */
 export function canAccessPath(user: User | null | undefined, pathname: string): boolean {
   if (!user) return false;
   if (isSuperAdmin(user)) return true;
-  if (isOverviewOnlyRole(user)) return pathname === '/';
-  return true;
+  const paths = ROLE_PATHS[user.role];
+  if (!paths) return false;
+  return paths.some((allowed) => pathAllowed(pathname, allowed));
+}
+
+/** General managers keep the Executive role but only see assigned troughs. */
+export function isGeneralManager(user: User | null | undefined): boolean {
+  return user?.role === 'executive' && user.executiveConfig?.designation === 'general_manager';
 }
 
 export const canOperate = (user: User | null) => !!user && user.role !== 'VIEWER';

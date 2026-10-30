@@ -1,6 +1,9 @@
 'use client';
 
-import { getPhase, useSimulator } from '@/contexts/SimulatorContext';
+import { useState } from 'react';
+import clsx from 'clsx';
+import { getPhase } from '@/contexts/SimulatorContext';
+import { useVisibleSimTroughs } from '@/hooks/useTroughAccess';
 import { LiveMetricsPanel } from '@/components/charts/LiveMetricsPanel';
 import { WitherWeightChart } from '@/components/charts/WitherWeightChart';
 import { WitherRunTable } from '@/components/charts/WitherRunTable';
@@ -59,31 +62,34 @@ function surfaceEndHourFrom(session: SimTroughData['session']): number {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LiveMonitoringPage() {
-  const { state } = useSimulator();
+  const { troughs, ready, restricted } = useVisibleSimTroughs();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = troughs.find((trough) => trough.data.id === selectedId) ?? troughs[0];
 
-  if (!state.loaded) {
+  if (!ready) {
     return (
       <>
-        <PageHeader title="Live Monitoring" description="Trough 1 — real-time withering data" />
+        <PageHeader title="Live Monitoring" description="Real-time withering data" />
         <Loading label="Loading simulator data…" />
       </>
     );
   }
 
-  // Find Trough 1 (trough_number === 1) or fall back to the first loaded trough
-  const trough1 = Object.values(state.troughs).find((t) => t.data.session.trough_number === 1)
-    ?? Object.values(state.troughs)[0];
-
-  if (!trough1) {
+  if (!selected) {
     return (
       <>
-        <PageHeader title="Live Monitoring" description="Trough 1 — real-time withering data" />
-        <p className="mt-8 text-center text-slate-500">No trough data available.</p>
+        <PageHeader
+          title="Live Monitoring"
+          description={restricted ? 'No troughs are assigned to this account' : 'Real-time withering data'}
+        />
+        <p className="mt-8 text-center text-slate-500">
+          {restricted ? 'Ask a Super admin to assign troughs in Users.' : 'No trough data available.'}
+        </p>
       </>
     );
   }
 
-  const { data, idx, running } = trough1;
+  const { data, idx, running } = selected;
   const { session, timeSeries } = data;
   const started = running || idx > 0;
 
@@ -96,9 +102,9 @@ export default function LiveMonitoringPage() {
   const surfaceEndHour  = surfaceEndHourFrom(session);
   const maxHour         = allChartPoints.at(-1)?.hour ?? 14;
 
-  const allWeights = allChartPoints.map((p) => p.weightKg);
-  const wMin = Math.min(...allWeights);
-  const wMax = Math.max(...allWeights);
+  const allWeights = allChartPoints.map((p) => p.weightKg).filter((weight) => Number.isFinite(weight));
+  const wMin = allWeights.length ? Math.min(...allWeights) : 0;
+  const wMax = allWeights.length ? Math.max(...allWeights) : 1;
   const pad  = (wMax - wMin) * 0.04;
   const yDomain: [number, number] = [Math.floor(wMin - pad), Math.ceil(wMax + pad)];
 
@@ -116,6 +122,28 @@ export default function LiveMonitoringPage() {
         title="Live Monitoring"
         description={`Trough ${session.trough_number} · ${session.airflow_mode} · ${session.starting_weight_kg.toLocaleString()} kg start`}
       />
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {troughs.map((trough) => {
+          const number = trough.data.session.trough_number;
+          const active = trough.data.id === selected.data.id;
+          return (
+            <button
+              key={trough.data.id}
+              type="button"
+              onClick={() => setSelectedId(trough.data.id)}
+              className={clsx(
+                'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
+                active
+                  ? 'border-tea-500 bg-tea-600/15 text-tea-700'
+                  : 'border-slate-700 bg-slate-900/40 text-slate-300 hover:border-slate-500',
+              )}
+            >
+              Trough {number}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Status banner */}
       <div className={`mb-4 flex items-center justify-between rounded-xl border px-4 py-3 ${

@@ -10,7 +10,7 @@ import logo from '@/images/logo.jpeg';
 import { LanguageSelect } from '@/components/layout/LanguageSelect';
 import { useLanguage } from '@/components/providers/LanguageProvider';
 import { ApiError, api } from '@/lib/api';
-import { setSession } from '@/lib/auth';
+import { homePathFor, setSession } from '@/lib/auth';
 import type { User } from '@/types';
 
 const REMEMBER_KEY = 'twcs.login.email';
@@ -123,7 +123,7 @@ function SignInForm() {
         { method: 'POST', json: { email: email.trim(), password, remember }, live: true },
       );
       setSession(result.token, result.user);
-      router.push('/');
+      router.push(homePathFor(result.user));
     } catch (error) {
       const message = error instanceof ApiError ? error.message : t.login.signInFailed;
       setErrors({ form: message });

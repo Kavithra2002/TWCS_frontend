@@ -73,14 +73,14 @@ function SimCard({
     : 0;
   const statusText = live && tunnel === 'connecting'
     ? 'Connecting'
-    : live && tunnel === 'error'
-      ? 'Tunnel'
-      : live && running && !hasReading
-        ? 'Waiting'
+    : live && running && liveError
+      ? 'No data'
+      : live && tunnel === 'error'
+        ? 'Tunnel'
         : live && running && hasReading
           ? 'Live'
-          : live && hasReading
-            ? 'Paused'
+          : live && running
+            ? 'Waiting'
             : phase ?? 'Ready';
 
   return (
@@ -135,9 +135,12 @@ function SimCard({
           {/* Phase + Run/Stop button */}
           <div className="flex shrink-0 items-center gap-2">
             <span className={`text-[11px] font-bold ${
-              phase ? PHASE_COLOR[phase] : live && hasReading ? 'text-green-400' : 'text-slate-600'
+              phase ? PHASE_COLOR[phase] : live && running && !liveError && hasReading ? 'text-green-400' : 'text-slate-600'
             }`}>
-              {statusText} <span className="font-normal text-slate-600">| {live ? 'LIVE' : session.airflow_mode}</span>
+              {statusText}{' '}
+              <span className="font-normal text-slate-600">
+                | {live ? (running && !liveError && hasReading ? 'LIVE' : running ? 'NO DATA' : 'OFF') : session.airflow_mode}
+              </span>
             </span>
 
             {isDone ? (
@@ -224,8 +227,8 @@ function SimCard({
             <span>
               {live && !hasReading
                 ? running
-                  ? 'Waiting for live samples'
-                  : 'Live feed'
+                  ? liveError ?? 'Waiting for live samples'
+                  : 'Press Run to connect'
                 : started
                   ? live
                     ? `${elapsedH}h elapsed · ${total} live samples`

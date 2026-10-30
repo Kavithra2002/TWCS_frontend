@@ -326,6 +326,16 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const closeLiveTrough = useCallback(async (id: string) => {
+    dispatch({ type: 'TUNNEL', id, tunnel: 'idle', liveError: null });
+    try {
+      await api('/test-version/tunnel/close', { method: 'POST', live: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not close the SSH tunnel';
+      dispatch({ type: 'TUNNEL', id, tunnel: 'error', liveError: message });
+    }
+  }, []);
+
   const play = useCallback(
     (id: string) => {
       markWallStart(id);
@@ -338,7 +348,10 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     [markWallStart, connectLiveTrough],
   );
 
-  const stop = useCallback((id: string) => dispatch({ type: 'STOP', id }), []);
+  const stop = useCallback((id: string) => {
+    dispatch({ type: 'STOP', id });
+    if (id === LIVE_TROUGH_ID) void closeLiveTrough(id);
+  }, [closeLiveTrough]);
 
   const playAll = useCallback(() => {
     const ids = Object.keys(stateRef.current.troughs);
@@ -350,7 +363,11 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [markWallStart, connectLiveTrough]);
 
-  const stopAll = useCallback(() => dispatch({ type: 'STOP_ALL' }), []);
+  const stopAll = useCallback(() => {
+    const liveWasRunning = stateRef.current.troughs[LIVE_TROUGH_ID]?.running ?? false;
+    dispatch({ type: 'STOP_ALL' });
+    if (liveWasRunning) void closeLiveTrough(LIVE_TROUGH_ID);
+  }, [closeLiveTrough]);
 
   const clear = useCallback(
     (id: string) => {
@@ -397,8 +414,23 @@ export function SimulatorProvider({ children }: { children: React.ReactNode }) {
           id: LIVE_TROUGH_ID,
           points: vboxRowsToPoints(status.live?.rows ?? []),
         });
-        if (status.live?.dbConnected) {
+        if (!status.live?.watching) return;
+        if (status.live.feedConnected) {
           dispatch({ type: 'TUNNEL', id: LIVE_TROUGH_ID, tunnel: 'open', liveError: null });
+        } else if (status.live.dbConnected) {
+          dispatch({
+            type: 'TUNNEL',
+            id: LIVE_TROUGH_ID,
+            tunnel: 'open',
+            liveError: 'Data is not being received. The VNet box may be off.',
+          });
+        } else {
+          dispatch({
+            type: 'TUNNEL',
+            id: LIVE_TROUGH_ID,
+            tunnel: 'error',
+            liveError: status.live.error ?? 'The SSH tunnel is not open.',
+          });
         }
       } catch (err) {
         if (cancelled) return;

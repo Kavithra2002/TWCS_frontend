@@ -321,6 +321,8 @@ export interface FeedStatusEvent {
 
 export interface RawLiveFeed {
   polledAt: string | null;
+  /** True only after Trough 6 Run, until Stop. */
+  watching: boolean;
   dbConnected: boolean;
   feedConnected: boolean;
   error: string | null;
@@ -355,4 +357,26 @@ export interface TestVersionStatus {
 export interface TestVersionTrough {
   id: string;
   available: boolean;
+}
+
+export type IntakeCell = string | number | boolean | null;
+export type IntakeTableName = 'sessions' | 'events' | 'time_series';
+
+/** One droplet table as shown on Test Version 2. Mirrors the backend intake snapshot. */
+export interface IntakeTableSnapshot {
+  columns: string[];
+  rows: Record<string, IntakeCell>[];
+  count: number;
+  latestAt: string | null;
+}
+
+export interface IntakeSnapshot {
+  polledAt: string;
+  ok: boolean;
+  dbConnected: boolean;
+  updating: boolean;
+  error: string | null;
+  ageMs: number | null;
+  tunnelHint: string;
+  tables: Record<IntakeTableName, IntakeTableSnapshot>;
 }

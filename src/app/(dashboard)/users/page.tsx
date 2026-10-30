@@ -14,6 +14,7 @@ import {
   LockKeyhole,
   Mail,
   Minus,
+  Pencil,
   Plus,
   UserRound,
   Wrench,
@@ -31,6 +32,7 @@ import {
   ASSIGNABLE_ROLES,
   canManageUsers,
   executiveDesignationLabel,
+  isAssignableRole,
   roleLabel,
 } from '@/lib/auth';
 import { fmtDateTime, fmtTroughCode } from '@/lib/format';
@@ -56,10 +58,11 @@ const loadUsers = () => api<User[]>('/users', { live: true });
 const loadTroughs = () => api<Trough[]>('/troughs', { live: true });
 
 export default function UsersPage() {
-  const { user } = useAuth();
+  const { user, syncUser } = useAuth();
   const { data, error, isLoading, mutate } = useSWR(canManageUsers(user) ? 'users' : null, loadUsers);
   const { data: troughs } = useSWR(canManageUsers(user) ? 'troughs-basic' : null, loadTroughs);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!canManageUsers(user)) {
@@ -75,7 +78,7 @@ export default function UsersPage() {
     <>
       <PageHeader
         title="Users"
-        description="Create Executive, Operation, and Engineering sign-ins"
+        description="Create and edit Executive, Operation, and Engineering sign-ins"
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -101,7 +104,8 @@ export default function UsersPage() {
                 <th>Role</th>
                 <th>Created</th>
                 <th>Updated</th>
-                <th className="w-[1%] text-right">Setup</th>
+                <th className="w-16 text-center">Edit</th>
+                <th className="w-28 text-center">Setup</th>
               </tr>
             </thead>
             <tbody>
@@ -118,6 +122,7 @@ export default function UsersPage() {
                     designation={designation}
                     troughs={troughs ?? []}
                     onToggle={() => setExpandedId(expanded ? null : row.id)}
+                    onEdit={() => setEditing(row)}
                     onSaved={() => void mutate()}
                   />
                 );
@@ -135,6 +140,15 @@ export default function UsersPage() {
           void mutate();
         }}
       />
+      <EditUserModal
+        user={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(updated) => {
+          setEditing(null);
+          if (user && updated.id === user.id) syncUser({ ...user, ...updated });
+          void mutate();
+        }}
+      />
     </>
   );
 }
@@ -146,6 +160,7 @@ function UserRows({
   designation,
   troughs,
   onToggle,
+  onEdit,
   onSaved,
 }: {
   user: User;
@@ -154,6 +169,7 @@ function UserRows({
   designation?: ExecutiveDesignation;
   troughs: Trough[];
   onToggle: () => void;
+  onEdit: () => void;
   onSaved: () => void;
 }) {
   return (
@@ -174,7 +190,18 @@ function UserRows({
         </td>
         <td className="tabular-nums text-slate-400">{user.createdAt ? fmtDateTime(user.createdAt) : '—'}</td>
         <td className="tabular-nums text-slate-400">{user.updatedAt ? fmtDateTime(user.updatedAt) : '—'}</td>
-        <td className="text-right">
+        <td className="text-center">
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Edit user"
+            aria-label={`Edit ${user.name}`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-tea-600/15 hover:text-tea-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-tea-400"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </td>
+        <td className="text-center">
           {isExecutive ? (
             <button
               type="button"
@@ -182,7 +209,7 @@ function UserRows({
               aria-expanded={expanded}
               aria-label={expanded ? 'Collapse executive settings' : 'Open executive setup'}
               className={clsx(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                'inline-flex h-8 w-[5.75rem] items-center justify-center gap-1.5 rounded-full text-xs font-semibold transition',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-tea-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
                 expanded
                   ? 'bg-tea-700 text-white shadow-sm shadow-tea-900/40 hover:bg-tea-600'
@@ -193,13 +220,13 @@ function UserRows({
               <span>{expanded ? 'Close' : 'Setup'}</span>
             </button>
           ) : (
-            <span className="text-xs text-slate-600">—</span>
+            <span className="text-xs text-slate-400">—</span>
           )}
         </td>
       </tr>
       {isExecutive && expanded && (
         <tr className="bg-slate-950/70">
-          <td colSpan={7} className="!p-0">
+          <td colSpan={8} className="!p-0">
             <ExecutiveConfigPanel user={user} troughs={troughs} onSaved={onSaved} onCollapse={onToggle} />
           </td>
         </tr>
@@ -292,7 +319,7 @@ function ExecutiveConfigPanel({
         <div>
           <p className="text-sm font-semibold text-slate-100">Executive setup · {user.name}</p>
           <p className="mt-0.5 text-xs text-slate-400">
-            Role stays Executive. Choose Normal executive or General manager, then assign troughs and extras.
+            Role stays Executive. Both designations open Overview and Live monitoring. A General manager only sees the troughs assigned here.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -329,11 +356,11 @@ function ExecutiveConfigPanel({
           <div className="mt-2 grid gap-2">
             {(
               [
-                { value: 'standard' as const, title: 'Normal executive', hint: 'Factory-wide executive access' },
+                { value: 'standard' as const, title: 'Normal executive', hint: 'Overview and Live monitoring · full trough list' },
                 {
                   value: 'general_manager' as const,
                   title: 'General manager',
-                  hint: 'Still Executive role · limited to assigned troughs',
+                  hint: 'Overview and Live monitoring · assigned troughs only',
                 },
               ] as const
             ).map((option) => {
@@ -418,7 +445,7 @@ function ExecutiveConfigPanel({
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <ToggleRow
               label="Live monitoring"
-              hint="Allow this executive to open live trough views later"
+              hint="Kept on the account. Live monitoring is already open for every executive."
               checked={canViewLiveMonitoring}
               onChange={setCanViewLiveMonitoring}
             />
@@ -592,51 +619,209 @@ function CreateUserModal({ open, onClose, onCreated }: { open: boolean; onClose:
           </button>
         </Field>
 
-        <fieldset>
-          <legend className="mb-2 text-[13px] font-medium text-slate-300">Role</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {ROLE_CHOICES.map((item) => {
-              const selected = role === item.value;
-              const label = ASSIGNABLE_ROLES.find((roleItem) => roleItem.value === item.value)?.label ?? item.value;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setRole(item.value)}
-                  className={clsx(
-                    'relative flex min-h-[92px] flex-col items-start gap-2 rounded-xl border px-2.5 py-2.5 text-left transition',
-                    selected
-                      ? 'border-tea-500 bg-tea-600/10 ring-1 ring-tea-500'
-                      : 'border-slate-700 bg-slate-950 hover:border-slate-500',
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      'flex h-8 w-8 items-center justify-center rounded-lg',
-                      selected ? 'bg-tea-600 text-white' : 'bg-slate-800 text-slate-300',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium leading-tight text-slate-100">{label}</span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{item.hint}</span>
-                  </span>
-                  {selected && (
-                    <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-tea-600 text-white">
-                      <Check className="h-2.5 w-2.5" />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <RolePicker role={role} onChange={setRole} />
 
         {error && <FormAlert>{error}</FormAlert>}
       </form>
     </Modal>
+  );
+}
+
+function EditUserModal({
+  user,
+  onClose,
+  onSaved,
+}: {
+  user: User | null;
+  onClose: () => void;
+  onSaved: (user: User) => void;
+}) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const roleLocked = user?.role === 'super_admin';
+
+  useEffect(() => {
+    if (!user) return;
+    setName(user.name);
+    setEmail(user.email);
+    setPassword('');
+    setShowPassword(false);
+    setRole(isAssignableRole(user.role) ? user.role : '');
+    setError('');
+    setSaving(false);
+  }, [user]);
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!user) return;
+    setError('');
+    if (name.trim().length < 2) {
+      setError('Enter the user name.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (password && password.length < 8) {
+      setError('Password must be at least 8 characters, or leave it blank.');
+      return;
+    }
+    if (!roleLocked && !ASSIGNABLE_ROLES.some((item) => item.value === role)) {
+      setError('Select a role.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await api<User>(`/users/${user.id}`, {
+        method: 'PATCH',
+        live: true,
+        json: {
+          name: name.trim(),
+          email: email.trim(),
+          ...(password ? { password } : {}),
+          ...(!roleLocked ? { role } : {}),
+        },
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update the user.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={user !== null}
+      title="Edit user"
+      description={user ? `Update the sign-in for ${user.name}.` : 'Update this sign-in.'}
+      icon={<ModalIcon icon={Pencil} />}
+      onClose={onClose}
+      panelClassName="max-w-md"
+      footer={
+        <>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-user" disabled={saving || !user}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </>
+      }
+    >
+      <form id="edit-user" className="space-y-3.5" onSubmit={onSubmit}>
+        <Field label="Name" icon={UserRound}>
+          <input
+            className={controlClass({ icon: true })}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Full name"
+            autoComplete="name"
+          />
+        </Field>
+        <Field label="Email" icon={Mail}>
+          <input
+            className={controlClass({ icon: true })}
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@factory.com"
+            autoComplete="off"
+          />
+        </Field>
+        <div>
+          <Field label="New password" icon={LockKeyhole}>
+            <input
+              className={clsx(controlClass({ icon: true }), 'pr-11')}
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 hover:text-slate-200"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </Field>
+          <p className="mt-1.5 text-[11px] text-slate-500">Leave blank to keep the current password.</p>
+        </div>
+
+        {roleLocked ? (
+          <Field label="Role">
+            <input className={controlClass()} value="Super admin" readOnly />
+          </Field>
+        ) : (
+          <>
+            <RolePicker role={role} onChange={setRole} />
+            {user?.role === 'executive' && role && role !== 'executive' && (
+              <p className="text-[11px] leading-snug text-amber-300">
+                Changing this role clears the executive setup for this person.
+              </p>
+            )}
+          </>
+        )}
+
+        {error && <FormAlert>{error}</FormAlert>}
+      </form>
+    </Modal>
+  );
+}
+
+function RolePicker({ role, onChange }: { role: string; onChange: (role: string) => void }) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-[13px] font-medium text-slate-300">Role</legend>
+      <div className="grid grid-cols-3 gap-2">
+        {ROLE_CHOICES.map((item) => {
+          const selected = role === item.value;
+          const label = ASSIGNABLE_ROLES.find((roleItem) => roleItem.value === item.value)?.label ?? item.value;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(item.value)}
+              className={clsx(
+                'relative flex min-h-[92px] flex-col items-start gap-2 rounded-xl border px-2.5 py-2.5 text-left transition',
+                selected
+                  ? 'border-tea-500 bg-tea-600/10 ring-1 ring-tea-500'
+                  : 'border-slate-700 bg-slate-950 hover:border-slate-500',
+              )}
+            >
+              <span
+                className={clsx(
+                  'flex h-8 w-8 items-center justify-center rounded-lg',
+                  selected ? 'bg-tea-600 text-white' : 'bg-slate-800 text-slate-300',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium leading-tight text-slate-100">{label}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{item.hint}</span>
+              </span>
+              {selected && (
+                <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-tea-600 text-white">
+                  <Check className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
